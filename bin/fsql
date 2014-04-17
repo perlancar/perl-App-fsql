@@ -299,8 +299,6 @@ run();
 
 =head1 DESCRIPTION
 
-NOTE: Early release, some formats and features not yet implemented.
-
 B<fsql> lets you perform SQL queries against "flat" files of various formats.
 Each file will be regarded as a SQL table. The magic of all this is performed by
 L<DBD::CSV> and L<SQL::Statement>.
