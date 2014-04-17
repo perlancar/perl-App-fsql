@@ -15,6 +15,7 @@ my %Opts = (
     format => 'text',
 );
 my %Tables;
+my $Query;
 
 our $DEBUG = $ENV{DEBUG};
 
@@ -40,6 +41,8 @@ sub _prepare_tempdir {
 sub _check_add_arg {
     my $arg = shift;
 
+    state $stdin_specified;
+
     my ($filename, $tablename);
     if ($arg =~ /(.+):(.+)/) {
         $filename  = $1;
@@ -51,7 +54,7 @@ sub _check_add_arg {
         $filename  = $arg;
         $tablename = $filename;
         $tablename =~ s!.+/!!; # strip path
-        $tablename =~ s!\.\w+\z/!!; # strip filename extension
+        $tablename =~ s!\.\w+\z!!; # strip filename extension
         $tablename =~ s/[^A-Za-z_0-9]+/_/g;
     }
 
@@ -59,13 +62,17 @@ sub _check_add_arg {
         warn "fsql: Invalid table name $tablename, please use alphanums only\n";
         exit 99;
     }
-    if ($Tables{$tablename}) {
+    if (exists $Tables{$tablename}) {
         warn "fsql: Duplicate table name $tablename, please use another name\n";
         exit 99;
     }
 
     my $fh;
     if ($filename eq '-') {
+        if ($stdin_specified++) {
+            warn "fsql: stdin cannot be specified more than once\n";
+            exit 99;
+        }
         $fh = *STDIN;
     } else {
         open $fh, "<", $filename
@@ -76,15 +83,20 @@ sub _check_add_arg {
 }
 
 sub _add_csv {
-    require File::Copy;
-
     my $arg = shift;
     my ($filename, $fh, $tablename) = _check_add_arg($arg);
+    my $outfilename;
+    if ($filename eq '-') {
+        my $tempdir = _prepare_tempdir();
+        $outfilename = "$tempdir/$tablename";
+        open my($fh), ">", $outfilename
+            or die "fsql: Can't write to $outfilename: $!\n";
+        print $fh $_ while <$fh>;
+    } else {
+        $outfilename = $filename;
+    }
 
-    my $tempdir = _prepare_tempdir();
-
-    copy($filename, "$tempdir/$tablename");
-    $Tables{$tablename} = 1;
+    $Tables{$tablename} = {f_file=>$outfilename};
 }
 
 sub _add_tsv {
@@ -95,9 +107,10 @@ sub _add_tsv {
 
     my $tempdir = _prepare_tempdir();
 
+    my $outfile;
     my $aoa = csv(in => $filename, sep_char=>"\t");
     csv(in => $aoa, out=>"$tempdir/$tablename");
-    $Tables{$tablename} = 1;
+    $Tables{$tablename} = {f_file=>$filename};
 }
 
 sub _add_ltsv {
@@ -110,8 +123,9 @@ sub _add_ltsv {
 
     my $ltsv = Text::LTSV->new;
     my $aoh  = $ltsv->parse_file($fh);
-    csv(in => $aoh, out => "$tempdir/$tablename");
-    $Tables{$tablename} = 1;
+    my $outfilename = "$tempdir/$tablename";
+    csv(in => $aoh, out => $outfilename);
+    $Tables{$tablename} = {f_file=>$outfilename};
 }
 
 sub _res_to_csv {
@@ -131,20 +145,21 @@ sub _res_to_csv {
     }
 
     my $tempdir = _prepare_tempdir();
+    my $outfilename = "$tempdir/$tablename";
 
     # handle special case of zero rows
     unless (@$res) {
         csv(in => [], headers => $tf ? $tf : ["column0"],
-            out => "$tempdir/$tablename");
+            out => $outfilename);
         goto END;
     }
 
     my $row0 = $res->[0];
 
     # handle another special case of array of scalars
-    unless (ref($row0) eq 'ARRAY') {
+    unless (ref($row0) eq 'ARRAY' || ref($row0) eq 'HASH') {
         csv(in => [map {[$_]} @$res], headers=>["column0"],
-            out => "$tempdir/$tablename");
+            out => $outfilename);
         goto END;
     }
 
@@ -153,10 +168,10 @@ sub _res_to_csv {
         $tf = [map {"column$_"} 0..@$row0-1];
     }
 
-    csv(in=>$res, headers=>$tf, out=>"$tempdir/$tablename");
+    csv(in=>$res, headers=>$tf, out=>$outfilename);
 
   END:
-    $Tables{$tablename} = 1;
+    $Tables{$tablename} = {f_file=>$outfilename};
 }
 
 sub _add_json {
@@ -227,12 +242,45 @@ USAGE
         },
     );
     exit 99 if !$res;
+    unless (@ARGV) {
+        warn "fsql: Please specify query\n";
+        exit 99;
+    }
+    if (@ARGV > 1) {
+        warn "fsql: Too many arguments, ".
+            "please specify only 1 argument (query)\n";
+        exit 99;
+    }
+    $Query = $ARGV[0];
     unless (keys %Tables) {
         _add_json("-");
+    }
+
+    if ($DEBUG) {
+        _debug("CSV tables: ".
+                   join(", ", map {"$_ => $Tables{$_}{f_file}"} keys %Tables));
     }
 }
 
 sub run {
+    require DBI;
+    require Perinci::Result::Format;
+
+    my $tempdir = _prepare_tempdir();
+    my $dbh = DBI->connect(
+        "dbi:CSV:", undef, undef,
+        {
+            RaiseError => 1,
+            csv_tables => \%Tables,
+        });
+    my $sth = $dbh->prepare($Query);
+    $sth->execute;
+    my @rows;
+    while (my $row = $sth->fetchrow_hashref) {
+        push @rows, $row;
+    }
+
+    print Perinci::Result::Format::format([200, "OK", \@rows], $Opts{format});
 }
 
 # MAIN
