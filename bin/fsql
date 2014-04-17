@@ -3,7 +3,7 @@
 use 5.010001;
 use strict;
 use warnings;
-use experimental;
+#use experimental 'smartmatch';
 
 use Getopt::Long;
 use Text::CSV_XS qw(csv);
