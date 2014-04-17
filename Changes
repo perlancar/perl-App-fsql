@@ -1,5 +1,18 @@
 Revision history for App-fsql
 
+0.02    2014-04-17 (SHARYANTO)
+
+        [ENHANCEMENTS]
+
+        - Add --format (previously missing).
+
+        - Add --show-schema.
+
+        [BUG FIXES]
+
+        - Fix a couple of bugs.
+
+
 0.01    2014-04-17 (SHARYANTO)
 
         - First release.
