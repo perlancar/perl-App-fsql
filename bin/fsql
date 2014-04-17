@@ -13,9 +13,9 @@ use Text::CSV_XS qw(csv);
 
 my %Opts = (
     format => 'text',
+    action => 'query',
 );
 my %Tables;
-my $Query;
 
 our $DEBUG = $ENV{DEBUG};
 
@@ -31,7 +31,7 @@ sub _prepare_tempdir {
 
     state $tempdir;
 
-    return if $tempdir;
+    return $tempdir if $tempdir;
     $tempdir = File::Temp::tempdir(
         CLEANUP => $ENV{FSQL_DEBUG_KEEP_TEMPDIR} ? 0:1);
     _debug("Created tempdir: $tempdir");
@@ -46,7 +46,7 @@ sub _check_add_arg {
     my ($filename, $tablename);
     if ($arg =~ /(.+):(.+)/) {
         $filename  = $1;
-        $tablename = $1;
+        $tablename = $2;
     } elsif ($arg eq '-') {
         $filename  = '-';
         $tablename = 'stdin';
@@ -96,7 +96,7 @@ sub _add_csv {
         $outfilename = $filename;
     }
 
-    $Tables{$tablename} = {f_file=>$outfilename};
+    $Tables{$tablename} = {orig_file=>$filename, f_file=>$outfilename};
 }
 
 sub _add_tsv {
@@ -110,7 +110,7 @@ sub _add_tsv {
     my $outfile;
     my $aoa = csv(in => $filename, sep_char=>"\t");
     csv(in => $aoa, out=>"$tempdir/$tablename");
-    $Tables{$tablename} = {f_file=>$filename};
+    $Tables{$tablename} = {orig_file=>$filename, f_file=>$filename};
 }
 
 sub _add_ltsv {
@@ -125,7 +125,7 @@ sub _add_ltsv {
     my $aoh  = $ltsv->parse_file($fh);
     my $outfilename = "$tempdir/$tablename";
     csv(in => $aoh, out => $outfilename);
-    $Tables{$tablename} = {f_file=>$outfilename};
+    $Tables{$tablename} = {orig_file=>$filename, f_file=>$outfilename};
 }
 
 sub _res_to_csv {
@@ -171,7 +171,7 @@ sub _res_to_csv {
     csv(in=>$res, headers=>$tf, out=>$outfilename);
 
   END:
-    $Tables{$tablename} = {f_file=>$outfilename};
+    $Tables{$tablename} = {orig_file=>$filename, f_file=>$outfilename};
 }
 
 sub _add_json {
@@ -218,10 +218,11 @@ sub parse_cmdline {
         'add-ltsv=s'     => sub { _add_ltsv($_[1]) },
         'add-json=s'     => sub { _add_json($_[1]) },
         'add-yaml=s'     => sub { _add_yaml($_[1]) },
+        'show-schema'    => sub { $Opts{action} = 'show-schema' },
         'help|h'           => sub {
             print <<USAGE;
 Usage:
-  fsql [OPTIONS]... <QUERY>
+  fsql [OPTIONS]... [ <QUERY> | --show-schema ]
   fsql --help
   fsql --version
 Options:
@@ -242,23 +243,8 @@ USAGE
         },
     );
     exit 99 if !$res;
-    unless (@ARGV) {
-        warn "fsql: Please specify query\n";
-        exit 99;
-    }
-    if (@ARGV > 1) {
-        warn "fsql: Too many arguments, ".
-            "please specify only 1 argument (query)\n";
-        exit 99;
-    }
-    $Query = $ARGV[0];
     unless (keys %Tables) {
         _add_json("-");
-    }
-
-    if ($DEBUG) {
-        _debug("CSV tables: ".
-                   join(", ", map {"$_ => $Tables{$_}{f_file}"} keys %Tables));
     }
 }
 
@@ -266,21 +252,66 @@ sub run {
     require DBI;
     require Perinci::Result::Format;
 
-    my $tempdir = _prepare_tempdir();
-    my $dbh = DBI->connect(
-        "dbi:CSV:", undef, undef,
-        {
-            RaiseError => 1,
-            csv_tables => \%Tables,
-        });
-    my $sth = $dbh->prepare($Query);
-    $sth->execute;
-    my @rows;
-    while (my $row = $sth->fetchrow_hashref) {
-        push @rows, $row;
+    my $res;
+    if ($Opts{action} eq 'show-schema') {
+
+        if (@ARGV) {
+            warn "fsql: show-schema does not require arguments\n";
+            exit 99;
+        }
+
+        my $tt = {};
+        for my $t (sort keys %Tables) {
+            my $file = $Tables{$t}{f_file};
+            my $orig_file = $Tables{$t}{orig_file};
+            open my($fh), "<", $file
+                or die "fsql: Can't open $file: $!\n";
+            my $line1 = <$fh>;
+            $line1 =~ s/\r?\n//;
+            my $columns = [split /,/, $line1];
+            $tt->{$t} = {
+                file => $file,
+                ( orig_file => $orig_file ) x
+                    ($orig_file eq $file ? 0:1),
+                columns => $columns,
+            };
+        }
+        $res = [200, "OK", {tables => $tt}];
+
+    } elsif ($Opts{action} eq 'query') {
+        unless (@ARGV) {
+            warn "fsql: Please specify query\n";
+            exit 99;
+        }
+        if (@ARGV > 1) {
+            warn "fsql: Too many arguments, ".
+                "please specify only 1 argument (query)\n";
+            exit 99;
+        }
+        my $query = $ARGV[0];
+
+        my $tempdir = _prepare_tempdir();
+        my $dbh = DBI->connect(
+            "dbi:CSV:", undef, undef,
+            {
+                RaiseError => 1,
+                csv_tables => \%Tables,
+            });
+        my $sth = $dbh->prepare($query);
+        $sth->execute;
+        my @rows;
+        while (my $row = $sth->fetchrow_hashref) {
+            push @rows, $row;
+        }
+        $res = [200, "OK", \@rows];
+
+    } else {
+
+        die "BUG: Unknown action\n";
+
     }
 
-    print Perinci::Result::Format::format([200, "OK", \@rows], $Opts{format});
+    print Perinci::Result::Format::format($res, $Opts{format});
 }
 
 # MAIN
@@ -294,7 +325,7 @@ run();
 
 =head1 SYNOPSIS
 
- fsql [OPTIONS] <QUERY>
+ fsql [OPTIONS] [ <QUERY> | --show-schema ]
 
 
 =head1 DESCRIPTION
