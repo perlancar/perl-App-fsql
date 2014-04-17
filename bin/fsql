@@ -26,10 +26,14 @@ sub _debug {
 }
 
 sub _prepare_tempdir {
+    require File::Temp;
+
     state $tempdir;
 
     return if $tempdir;
-    $tempdir = tempdir(CLEANUP => 1);
+    $tempdir = File::Temp::tempdir(
+        CLEANUP => $ENV{FSQL_DEBUG_KEEP_TEMPDIR} ? 0:1);
+    _debug("Created tempdir: $tempdir");
     return $tempdir;
 }
 
@@ -40,16 +44,18 @@ sub _check_add_arg {
     if ($arg =~ /(.+):(.+)/) {
         $filename  = $1;
         $tablename = $1;
-    } elsif ($args eq '-') {
+    } elsif ($arg eq '-') {
         $filename  = '-';
         $tablename = 'stdin';
     } else {
         $filename  = $arg;
         $tablename = $filename;
-        $tablename =~ s/[^A-Za-z_0-9]+/-/g;
+        $tablename =~ s!.+/!!; # strip path
+        $tablename =~ s!\.\w+\z/!!; # strip filename extension
+        $tablename =~ s/[^A-Za-z_0-9]+/_/g;
     }
 
-    unless ($tablename =~ /\A[A-Za-z_][A-Za-z_0-9]*/) {
+    unless ($tablename =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/) {
         warn "fsql: Invalid table name $tablename, please use alphanums only\n";
         exit 99;
     }
@@ -108,24 +114,83 @@ sub _add_ltsv {
     $Tables{$tablename} = 1;
 }
 
-sub _add_json {
+sub _res_to_csv {
     require Perinci::Result::Util;
+
+    my ($res, $filename, $tablename) = @_;
+    my $tf;
+    if (Perinci::Result::Util::is_env_res($res)) {
+        $tf = $res->[3]{"table.fields"}
+            if $res->[3] && $res->[3]{"table.fields"};
+        $res = $res->[2];
+    }
+
+    unless (ref($res) eq 'ARRAY') {
+        warn "fsql: Data is not an array: $filename\n";
+        exit 99;
+    }
+
+    my $tempdir = _prepare_tempdir();
+
+    # handle special case of zero rows
+    unless (@$res) {
+        csv(in => [], headers => $tf ? $tf : ["column0"],
+            out => "$tempdir/$tablename");
+        goto END;
+    }
+
+    my $row0 = $res->[0];
+
+    # handle another special case of array of scalars
+    unless (ref($row0) eq 'ARRAY') {
+        csv(in => [map {[$_]} @$res], headers=>["column0"],
+            out => "$tempdir/$tablename");
+        goto END;
+    }
+
+    # produce headers for aoa without tf
+    if (ref($row0) eq 'ARRAY' && !$tf) {
+        $tf = [map {"column$_"} 0..@$row0-1];
+    }
+
+    csv(in=>$res, headers=>$tf, out=>"$tempdir/$tablename");
+
+  END:
+    $Tables{$tablename} = 1;
+}
+
+sub _add_json {
+    require JSON;
 
     my $arg = shift;
     my ($filename, $fh, $tablename) = _check_add_arg($arg);
 
-    $Tables{$tablename} = 1;
+    state $json = JSON->new->allow_nonref;
+    my $res;
+    {
+        local $/;
+        my $content = <$fh>;
+        $res = $json->decode($content);
+    }
+    _res_to_csv($res, $filename, $tablename);
 }
 
 sub _add_yaml {
-    require Perinci::Result::Util;
+    require YAML::XS;
 
     my $arg = shift;
     my ($filename, $fh, $tablename) = _check_add_arg($arg);
 
     # YAML::XS::LoadFile doesn't accept filehandle
     my $res;
-    $Tables{$tablename} = 1;
+    if ($filename eq '-') {
+        local $/;
+        my $content = <$fh>;
+        $res = YAML::XS::Load($content);
+    } else {
+        $res = YAML::XS::LoadFile($filename);
+    }
+    _res_to_csv($res, $filename, $tablename);
 }
 
 sub parse_cmdline {
@@ -162,91 +227,12 @@ USAGE
         },
     );
     exit 99 if !$res;
-    if (!%TABLES) {
+    unless (keys %Tables) {
         _add_json("-");
     }
 }
 
 sub run {
-    my $ifh; # input handle
-    if (@ARGV) {
-        my $fname = shift @ARGV;
-        if ($fname eq '-') {
-            $ifh = *STDIN;
-        } else {
-            open $ifh, "<", $fname or die "Can't open input file $fname: $!\n";
-        }
-    } else {
-        $ifh = *STDIN;
-    }
-
-    my $phase = 2;
-    my $ofh; # output handle
-    if (@ARGV) {
-        my $fname = shift @ARGV;
-        if ($fname eq '-') {
-            $ofh = *STDOUT;
-        } else {
-            open $ofh,
-                ($Opts{read_output} ? "+" : "") . ($Opts{append} ? ">>" : ">"),
-                    $fname
-                or die "Can't open output file $fname: $!\n";
-            if ($Opts{read_output}) {
-                seek $ofh, 0, 0;
-                $phase = 1;
-            }
-        }
-    } else {
-        $ofh = *STDOUT;
-    }
-
-    my ($line, $memkey);
-    my %mem;
-    my $sub_reset_mem = sub {
-        if ($Opts{num_entries} > 0) {
-            require Tie::Cache;
-            tie %mem, 'Tie::Cache', $Opts{num_entries};
-        } else {
-            %mem = ();
-        }
-    };
-    $sub_reset_mem->();
-    require Digest::MD5 if $Opts{md5};
-    no warnings; # we want to shut up 'substr outside of string'
-    while (1) {
-        if ($phase == 1) {
-            # phase 1 is just reading the output file
-            $line = <$ofh>;
-            if (!$line) {
-                $phase = 2;
-                next;
-            }
-        } else {
-            $line = <$ifh>;
-            if (!$line) {
-                last;
-            }
-        }
-        if ($Opts{forget_pattern} && $line =~ $Opts{forget_pattern}) {
-            $sub_reset_mem->();
-        }
-
-        $memkey = $Opts{check_chars} > 0 ?
-            substr($line, $Opts{skip_chars}, $Opts{check_chars}) :
-                substr($line, $Opts{skip_chars});
-        $memkey = lc($memkey) if $Opts{ignore_case};
-        $memkey = Digest::MD5::md5($memkey) if $Opts{md5};
-
-        if ($phase == 2) {
-            if ($mem{$memkey}) {
-                print $ofh $line if $Opts{show_repeated};
-            } else {
-                print $ofh $line if $Opts{show_unique};
-            }
-        }
-
-        $mem{$memkey} = 1;
-    }
 }
 
 # MAIN
@@ -319,7 +305,7 @@ Like C<--add-json>, but will load file as YAML.
 
 255 on I/O or SQL error.
 
-99 on command-line options error.
+99 on command-line options or input data error.
 
 
 =head1 FAQ
