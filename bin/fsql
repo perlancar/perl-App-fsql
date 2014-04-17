@@ -231,7 +231,7 @@ Options:
   --add-ltsv=s
   --add-json=s
   --add-yaml=s
-  --format=s
+  --format=s, --json, --yaml
 For more details, see the manpage/documentation.
 USAGE
             exit 0;
