@@ -1,0 +1,337 @@
+#!/usr/bin/env perl
+
+use 5.010001;
+use strict;
+use warnings;
+use experimental;
+
+use Getopt::Long;
+use Text::CSV_XS qw(csv);
+
+# VERSION
+# DATE
+
+my %Opts = (
+    format => 'text',
+);
+my %Tables;
+
+our $DEBUG = $ENV{DEBUG};
+
+sub _debug {
+    my $msg = shift;
+
+    $msg .= "\n" unless $msg =~ /\n$/;
+    warn "DEBUG: $msg" if $DEBUG;
+}
+
+sub _prepare_tempdir {
+    state $tempdir;
+
+    return if $tempdir;
+    $tempdir = tempdir(CLEANUP => 1);
+    return $tempdir;
+}
+
+sub _check_add_arg {
+    my $arg = shift;
+
+    my ($filename, $tablename);
+    if ($arg =~ /(.+):(.+)/) {
+        $filename  = $1;
+        $tablename = $1;
+    } elsif ($args eq '-') {
+        $filename  = '-';
+        $tablename = 'stdin';
+    } else {
+        $filename  = $arg;
+        $tablename = $filename;
+        $tablename =~ s/[^A-Za-z_0-9]+/-/g;
+    }
+
+    unless ($tablename =~ /\A[A-Za-z_][A-Za-z_0-9]*/) {
+        warn "fsql: Invalid table name $tablename, please use alphanums only\n";
+        exit 99;
+    }
+    if ($Tables{$tablename}) {
+        warn "fsql: Duplicate table name $tablename, please use another name\n";
+        exit 99;
+    }
+
+    my $fh;
+    if ($filename eq '-') {
+        $fh = *STDIN;
+    } else {
+        open $fh, "<", $filename
+            or die "fsql: Can't open $filename: $!\n";
+    }
+
+    return ($filename, $fh, $tablename);
+}
+
+sub _add_csv {
+    require File::Copy;
+
+    my $arg = shift;
+    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+
+    my $tempdir = _prepare_tempdir();
+
+    copy($filename, "$tempdir/$tablename");
+    $Tables{$tablename} = 1;
+}
+
+sub _add_tsv {
+    # XXX
+
+    my $arg = shift;
+    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+
+    my $tempdir = _prepare_tempdir();
+
+    my $aoa = csv(in => $filename, sep_char=>"\t");
+    csv(in => $aoa, out=>"$tempdir/$tablename");
+    $Tables{$tablename} = 1;
+}
+
+sub _add_ltsv {
+    require Text::LTSV;
+
+    my $arg = shift;
+    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+
+    my $tempdir = _prepare_tempdir();
+
+    my $ltsv = Text::LTSV->new;
+    my $aoh  = $ltsv->parse_file($fh);
+    csv(in => $aoh, out => "$tempdir/$tablename");
+    $Tables{$tablename} = 1;
+}
+
+sub _add_json {
+    require Perinci::Result::Util;
+
+    my $arg = shift;
+    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+
+    $Tables{$tablename} = 1;
+}
+
+sub _add_yaml {
+    require Perinci::Result::Util;
+
+    my $arg = shift;
+    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+
+    # YAML::XS::LoadFile doesn't accept filehandle
+    my $res;
+    $Tables{$tablename} = 1;
+}
+
+sub parse_cmdline {
+    my $res = GetOptions(
+        'name=s'         => \$Opts{name},
+        'json'           => sub { $Opts{format} = 'json' },
+        'yaml'           => sub { $Opts{format} = 'yaml' },
+        'add-csv=s'      => sub { _add_csv($_[1]) },
+        'add-tsv=s'      => sub { _add_tsv($_[1]) },
+        'add-ltsv=s'     => sub { _add_ltsv($_[1]) },
+        'add-json=s'     => sub { _add_json($_[1]) },
+        'add-yaml=s'     => sub { _add_yaml($_[1]) },
+        'help|h'           => sub {
+            print <<USAGE;
+Usage:
+  fsql [OPTIONS]... <QUERY>
+  fsql --help
+  fsql --version
+Options:
+  --add-csv=s
+  --add-tsv=s
+  --add-ltsv=s
+  --add-json=s
+  --add-yaml=s
+  --format=s
+For more details, see the manpage/documentation.
+USAGE
+            exit 0;
+        },
+        'version|v'      => sub {
+            say "fsql version ", ($main::VERSION // "dev"),
+                ($main::DATE ? " ($main::DATE)" : "");
+            exit 0;
+        },
+    );
+    exit 99 if !$res;
+    if (!%TABLES) {
+        _add_json("-");
+    }
+}
+
+sub run {
+    my $ifh; # input handle
+    if (@ARGV) {
+        my $fname = shift @ARGV;
+        if ($fname eq '-') {
+            $ifh = *STDIN;
+        } else {
+            open $ifh, "<", $fname or die "Can't open input file $fname: $!\n";
+        }
+    } else {
+        $ifh = *STDIN;
+    }
+
+    my $phase = 2;
+    my $ofh; # output handle
+    if (@ARGV) {
+        my $fname = shift @ARGV;
+        if ($fname eq '-') {
+            $ofh = *STDOUT;
+        } else {
+            open $ofh,
+                ($Opts{read_output} ? "+" : "") . ($Opts{append} ? ">>" : ">"),
+                    $fname
+                or die "Can't open output file $fname: $!\n";
+            if ($Opts{read_output}) {
+                seek $ofh, 0, 0;
+                $phase = 1;
+            }
+        }
+    } else {
+        $ofh = *STDOUT;
+    }
+
+    my ($line, $memkey);
+    my %mem;
+    my $sub_reset_mem = sub {
+        if ($Opts{num_entries} > 0) {
+            require Tie::Cache;
+            tie %mem, 'Tie::Cache', $Opts{num_entries};
+        } else {
+            %mem = ();
+        }
+    };
+    $sub_reset_mem->();
+    require Digest::MD5 if $Opts{md5};
+    no warnings; # we want to shut up 'substr outside of string'
+    while (1) {
+        if ($phase == 1) {
+            # phase 1 is just reading the output file
+            $line = <$ofh>;
+            if (!$line) {
+                $phase = 2;
+                next;
+            }
+        } else {
+            $line = <$ifh>;
+            if (!$line) {
+                last;
+            }
+        }
+        if ($Opts{forget_pattern} && $line =~ $Opts{forget_pattern}) {
+            $sub_reset_mem->();
+        }
+
+        $memkey = $Opts{check_chars} > 0 ?
+            substr($line, $Opts{skip_chars}, $Opts{check_chars}) :
+                substr($line, $Opts{skip_chars});
+        $memkey = lc($memkey) if $Opts{ignore_case};
+        $memkey = Digest::MD5::md5($memkey) if $Opts{md5};
+
+        if ($phase == 2) {
+            if ($mem{$memkey}) {
+                print $ofh $line if $Opts{show_repeated};
+            } else {
+                print $ofh $line if $Opts{show_unique};
+            }
+        }
+
+        $mem{$memkey} = 1;
+    }
+}
+
+# MAIN
+
+parse_cmdline();
+run();
+
+1;
+# ABSTRACT: Perform SQL queries against files in CSV/TSV/LTSV/JSON/YAML formats
+# PODNAME: fsql
+
+=head1 SYNOPSIS
+
+ fsql [OPTIONS] <QUERY>
+
+
+=head1 DESCRIPTION
+
+NOTE: Early release, some formats and features not yet implemented.
+
+B<fsql> lets you perform SQL queries against "flat" files of various formats.
+Each file will be regarded as a SQL table. The magic of all this is performed by
+L<DBD::CSV> and L<SQL::Statement>.
+
+There must be at least one table specified (either with C<--add-csv>,
+C<--add-tsv>, C<--add-ltsv>, C<--add-json>, C<--add-yaml>). If none of those
+options are specified, a JSON table is assumed in STDIN.
+
+
+=head1 OPTIONS
+
+=over
+
+=item * --add-csv=FILENAME[:TABLENAME]
+
+Add a table from a CSV file. If C<TABLENAME> is not specified, it will be taken
+from C<FILENAME> (e.g. with filename C<foo-bar.csv>, table name will be
+C<foo_bar>). C<FILENAME> can be C<-> to mean the standard input (the default
+table name will be C<stdin>). Will croak if duplicate table name is detected.
+
+Table name must match regex C</\A[A-Za-z_][A-Za-z_0-9]*\z/>.
+
+=item * --add-tsv=FILENAME[:TABLENAME]
+
+Like C<--add-csv>, but will load file as TSV (tab-separated value).
+
+=item * --add-ltsv=FILENAME[:TABLENAME]
+
+Like C<--add-csv>, but will load file as LTSV (labeled tab separated value, see
+L<Text::LTSV>). Names of columns will be taken from the first row.
+
+=item * --add-json=FILENAME[:TABLENAME]
+
+Like C<--add-csv>, but will load file as JSON.
+
+Data can be array, or array of arrays, or array of hashes, or an enveloped
+response (see L<Rinci::function>), so it is suitable to accept piped output of
+L<Perinci::CmdLine>-based programs.
+
+=item * --add-yaml=FILENAME[:TABLENAME]
+
+Like C<--add-json>, but will load file as YAML.
+
+=back
+
+
+=head1 EXIT CODES
+
+0 on success.
+
+255 on I/O or SQL error.
+
+99 on command-line options error.
+
+
+=head1 FAQ
+
+
+=head1 TODO
+
+Allow customized CSV separator and quoting.
+
+
+=head1 SEE ALSO
+
+L<uniq>
+
+=cut
