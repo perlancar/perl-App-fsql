@@ -1,5 +1,12 @@
 Revision history for App-fsql
 
+0.03    2014-04-22 (SHARYANTO)
+
+        - No functional changes.
+
+        - Fix a couple of bugs and add some missing doc.
+
+
 0.02    2014-04-17 (SHARYANTO)
 
         [ENHANCEMENTS]
