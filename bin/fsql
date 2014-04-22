@@ -387,6 +387,10 @@ Equivalent to C<--format json>.
 
 Equivalent to C<--format yaml>.
 
+=item * --show-schema
+
+Instead of running a query, show schema instead. This is useful for debugging.
+
 =back
 
 
