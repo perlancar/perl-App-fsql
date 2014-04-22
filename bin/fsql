@@ -406,8 +406,4 @@ Equivalent to C<--format yaml>.
 Allow customized CSV separator and quoting.
 
 
-=head1 SEE ALSO
-
-L<uniq>
-
 =cut
