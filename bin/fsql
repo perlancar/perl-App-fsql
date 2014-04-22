@@ -337,7 +337,8 @@ L<DBD::CSV> and L<SQL::Statement>.
 
 There must be at least one table specified (either with C<--add-csv>,
 C<--add-tsv>, C<--add-ltsv>, C<--add-json>, C<--add-yaml>). If none of those
-options are specified, a JSON table is assumed in STDIN.
+options are specified, a JSON table is assumed in STDIN and table name C<stdin>
+(if you want to change the table name, you can use C<--add-json -:somename>.
 
 
 =head1 OPTIONS
