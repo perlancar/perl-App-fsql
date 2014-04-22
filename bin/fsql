@@ -96,7 +96,11 @@ sub _add_csv {
         $outfilename = $filename;
     }
 
-    $Tables{$tablename} = {orig_file=>$filename, f_file=>$outfilename};
+    $Tables{$tablename} = {
+        f_file    => $outfilename,
+        orig_file => $filename,
+        fmt       => 'csv',
+    };
 }
 
 sub _add_tsv {
@@ -111,7 +115,11 @@ sub _add_tsv {
     my $aoa = csv(in => $filename, sep_char=>"\t");
     my $outfilename = "$tempdir/$tablename";
     csv(in => $aoa, out=>"$tempdir/$tablename");
-    $Tables{$tablename} = {orig_file=>$filename, f_file=>$outfilename};
+    $Tables{$tablename} = {
+        f_file    => $outfilename,
+        orig_file => $filename,
+        fmt       => 'tsv',
+    };
 }
 
 sub _add_ltsv {
@@ -126,13 +134,17 @@ sub _add_ltsv {
     my $aoh  = $ltsv->parse_file($fh);
     my $outfilename = "$tempdir/$tablename";
     csv(in => $aoh, out => $outfilename);
-    $Tables{$tablename} = {orig_file=>$filename, f_file=>$outfilename};
+    $Tables{$tablename} = {
+        f_file    => $outfilename,
+        orig_file => $filename,
+        fmt       => 'ltsv',
+    };
 }
 
 sub _res_to_csv {
     require Perinci::Result::Util;
 
-    my ($res, $filename, $tablename) = @_;
+    my ($res, $filename, $tablename, $fmt) = @_;
     my $tf;
     if (Perinci::Result::Util::is_env_res($res)) {
         $tf = $res->[3]{"table.fields"}
@@ -172,7 +184,11 @@ sub _res_to_csv {
     csv(in=>$res, headers=>$tf, out=>$outfilename);
 
   END:
-    $Tables{$tablename} = {orig_file=>$filename, f_file=>$outfilename};
+    $Tables{$tablename} = {
+        f_file    => $outfilename,
+        orig_file => $filename,
+        fmt       => $fmt,
+    };
 }
 
 sub _add_json {
@@ -188,7 +204,7 @@ sub _add_json {
         my $content = <$fh>;
         $res = $json->decode($content);
     }
-    _res_to_csv($res, $filename, $tablename);
+    _res_to_csv($res, $filename, $tablename, 'json');
 }
 
 sub _add_yaml {
@@ -206,7 +222,7 @@ sub _add_yaml {
     } else {
         $res = YAML::XS::LoadFile($filename);
     }
-    _res_to_csv($res, $filename, $tablename);
+    _res_to_csv($res, $filename, $tablename, 'yaml');
 }
 
 sub parse_cmdline {
