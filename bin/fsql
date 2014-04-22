@@ -97,7 +97,7 @@ sub _add_csv {
     }
 
     $Tables{$tablename} = {
-        f_file    => $outfilename,
+        file      => $outfilename,
         orig_file => $filename,
         fmt       => 'csv',
     };
@@ -116,7 +116,7 @@ sub _add_tsv {
     my $outfilename = "$tempdir/$tablename";
     csv(in => $aoa, out=>"$tempdir/$tablename");
     $Tables{$tablename} = {
-        f_file    => $outfilename,
+        file      => $outfilename,
         orig_file => $filename,
         fmt       => 'tsv',
     };
@@ -135,7 +135,7 @@ sub _add_ltsv {
     my $outfilename = "$tempdir/$tablename";
     csv(in => $aoh, out => $outfilename);
     $Tables{$tablename} = {
-        f_file    => $outfilename,
+        file      => $outfilename,
         orig_file => $filename,
         fmt       => 'ltsv',
     };
@@ -185,7 +185,7 @@ sub _res_to_csv {
 
   END:
     $Tables{$tablename} = {
-        f_file    => $outfilename,
+        file      => $outfilename,
         orig_file => $filename,
         fmt       => $fmt,
     };
@@ -279,21 +279,13 @@ sub run {
 
         my $tt = {};
         for my $t (sort keys %Tables) {
-            my $file = $Tables{$t}{f_file};
-            my $orig_file = $Tables{$t}{orig_file};
-            open my($fh), "<", $file
-                or die "fsql: Can't open $file: $!\n";
+            open my($fh), "<", $Tables{$t}{file}
+                or die "fsql: Can't open $Tables{$t}{file}: $!\n";
             my $line1 = <$fh>;
             $line1 =~ s/\r?\n//;
-            my $columns = [split /,/, $line1];
-            $tt->{$t} = {
-                file => $file,
-                ( orig_file => $orig_file ) x
-                    ($orig_file eq $file ? 0:1),
-                columns => $columns,
-            };
+            $Tables{$t}{columns} = [split /,/, $line1];
         }
-        $res = [200, "OK", {tables => $tt}];
+        $res = [200, "OK", {tables => \%Tables}];
 
     } elsif ($Opts{action} eq 'query') {
         unless (@ARGV) {
@@ -312,7 +304,10 @@ sub run {
             "dbi:CSV:", undef, undef,
             {
                 RaiseError => 1,
-                csv_tables => \%Tables,
+                csv_tables => {
+                    map { $_=>{f_file=>$Tables{$_}{file}} }
+                        keys %Tables,
+                },
             });
         my $sth = $dbh->prepare($query);
         $sth->execute;
