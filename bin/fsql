@@ -109,8 +109,9 @@ sub _add_tsv {
 
     my $outfile;
     my $aoa = csv(in => $filename, sep_char=>"\t");
+    my $outfilename = "$tempdir/$tablename";
     csv(in => $aoa, out=>"$tempdir/$tablename");
-    $Tables{$tablename} = {orig_file=>$filename, f_file=>$filename};
+    $Tables{$tablename} = {orig_file=>$filename, f_file=>$outfilename};
 }
 
 sub _add_ltsv {
