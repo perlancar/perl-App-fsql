@@ -224,6 +224,20 @@ sub _add_yaml {
     _res_to_csv($res, $filename, $tablename, 'yaml');
 }
 
+sub _add_perl {
+    my $arg = shift;
+    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+
+    my $res;
+    {
+        local $/;
+        my $content = <$fh>;
+        $res = eval $content;
+        die if $@;
+    }
+    _res_to_csv($res, $filename, $tablename, 'perl');
+}
+
 sub parse_cmdline {
     my $res = GetOptions(
         'format|f=s'     => \$Opts{format},
@@ -232,6 +246,7 @@ sub parse_cmdline {
         'add-ltsv=s'     => sub { _add_ltsv($_[1]) },
         'add-json=s'     => sub { _add_json($_[1]) },
         'add-yaml=s'     => sub { _add_yaml($_[1]) },
+        'add-perl=s'     => sub { _add_perl($_[1]) },
         'show-schema'    => sub { $Opts{action} = 'show-schema' },
         'help|h'           => sub {
             print <<USAGE;
@@ -245,6 +260,7 @@ Options:
   --add-ltsv=s
   --add-json=s
   --add-yaml=s
+  --add-perl=s
   --format=s, -f
 For more details, see the manpage/documentation.
 USAGE
@@ -345,6 +361,9 @@ sub show_result {
         for my $row (@{ $res->[2] }) {
             say join("\t", map {"$_:$row->{$_}"} sort keys %$row);
         }
+    } elsif ($Opts{format} eq 'perl') {
+        require Data::Format::Pretty::Perl;
+        print Data::Format::Pretty::Perl::format_pretty($res->[2]);
     } else {
         print Perinci::Result::Format::format($res, $Opts{format});
     }
@@ -410,13 +429,20 @@ L<Perinci::CmdLine>-based programs.
 
 Like C<--add-json>, but will load file as YAML.
 
+=item * --add-perl=FILENAME[:TABLENAME]
+
+Like C<--add-perl>, but will load file as Perl.
+
 =item * --format=FORMAT (default: text), -f
 
-Set output format. The value C<csv> or C<tsv> or C<ltsv> will cause query
-results to be output as a comma-separated or TAB-separated list or labeled-TAB
-separated list, respectively. As this isn't very useful for a schema listing,
-these values will be silently converted to C<text> if C<--show-schema> is also
-present.
+Set output format.
+
+The value C<csv> or C<tsv> or C<ltsv> will cause query results to be output as a
+comma-separated or TAB-separated list or labeled-TAB separated list,
+respectively. As this isn't very useful for a schema listing, these values will
+be silently converted to C<text> if C<--show-schema> is also present.
+
+The value of C<perl> will format using L<Data::Format::Pretty::Perl>.
 
 Any other value will be passed to L<Perinci::Result::Format>'s C<format()>.
 
