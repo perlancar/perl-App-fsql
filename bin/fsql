@@ -389,10 +389,10 @@ B<fsql> lets you perform SQL queries against "flat" files of various formats.
 Each file will be regarded as a SQL table. The magic of all this is performed by
 L<DBD::CSV> and L<SQL::Statement>.
 
-There must be at least one table specified (either with C<--add-csv>,
-C<--add-tsv>, C<--add-ltsv>, C<--add-json>, C<--add-yaml>). If none of those
-options are specified, a JSON table is assumed in STDIN and table name C<stdin>
-(if you want to change the table name, you can use C<--add-json -:somename>.
+There must be at least one table specified (with one of the C<--add-*> options).
+If none of those options are specified, a JSON table is assumed in STDIN and
+table name C<stdin> (if you want to change the table name, you can use
+C<--add-json -:somename>.
 
 
 =head1 OPTIONS
