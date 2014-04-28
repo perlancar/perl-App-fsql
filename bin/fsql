@@ -366,8 +366,13 @@ sub show_result {
     } elsif ($Opts{format} eq 'ltsv') {
         # Text::LTSV expects a format of [[k=>v, k2=>v2, ...], ...]. we might as
         # well print it ourselves.
+        my $ff = $res->[3]{"table.fields"};
         for my $row (@{ $res->[2] }) {
-            say join("\t", map {"$_:$row->{$_}"} sort keys %$row);
+            if (ref($row) eq 'HASH') {
+                say join("\t", map {"$_:".($row->{$_} // '')} @$ff);
+            } else {
+                say join("\t", map {"$ff->[$_]:".($row->[$_] // '')} 0..@$ff-1);
+            }
         }
     } elsif ($Opts{format} eq 'perl') {
         require Data::Format::Pretty::Perl;
