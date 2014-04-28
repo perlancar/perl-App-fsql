@@ -12,7 +12,7 @@ use Text::CSV_XS qw(csv);
 # DATE
 
 my %Opts = (
-    format => 'text',
+    format => undef,
     action => 'query',
 );
 my %Tables;
@@ -59,7 +59,8 @@ sub _check_add_arg {
     }
 
     unless ($tablename =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/) {
-        warn "fsql: Invalid table name $tablename, please use alphanums only\n";
+        warn "fsql: Invalid table name $tablename, ".
+            "please use letter+alphanums only\n";
         exit 99;
     }
     if (exists $Tables{$tablename}) {
@@ -104,8 +105,6 @@ sub _add_csv {
 }
 
 sub _add_tsv {
-    # XXX
-
     my $arg = shift;
     my ($filename, $fh, $tablename) = _check_add_arg($arg);
 
@@ -261,6 +260,14 @@ USAGE
     unless (keys %Tables) {
         _add_json("-");
     }
+
+    # pick default format from the most used input format
+    unless ($Opts{format}) {
+        my %fmts;
+        $fmts{$Tables{$_}{fmt}}++ for keys %Tables;
+        my @fmts = sort {$fmts{$b} <=> $fmts{$a} || $a cmp $b} keys %fmts;
+        $Opts{format} = $fmts[0];
+    }
 }
 
 sub run {
@@ -268,6 +275,7 @@ sub run {
     require Perinci::Result::Format;
 
     my $res;
+
     if ($Opts{action} eq 'show-schema') {
 
         if (@ARGV) {
@@ -322,11 +330,16 @@ sub run {
 
     }
 
+    show_result($res);
+}
+
+sub show_result {
+    my $res = shift;
+
     if ($Opts{format} =~ /[ct]sv/) {
         csv(in => $res->[2], out => *STDOUT,
 	    sep_char => $Opts{format} eq 'tsv' ? "\t" : ',');
-    }
-    else {
+    } else {
         print Perinci::Result::Format::format($res, $Opts{format});
     }
 }
