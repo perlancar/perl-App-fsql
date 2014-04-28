@@ -53,7 +53,7 @@ sub _check_add_arg {
     } else {
         $filename  = $arg;
         $tablename = $filename;
-        $tablename =~ s!.+/!!; # strip path
+        $tablename =~ s!.+[/\\]!!; # strip path
         $tablename =~ s!\.\w+\z!!; # strip filename extension
         $tablename =~ s/[^A-Za-z_0-9]+/_/g;
     }
