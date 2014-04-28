@@ -227,7 +227,7 @@ sub _add_yaml {
 
 sub parse_cmdline {
     my $res = GetOptions(
-        'format'         => \$Opts{format},
+        'format=s'       => \$Opts{format},
         'json'           => sub { $Opts{format} = 'json' },
         'yaml'           => sub { $Opts{format} = 'yaml' },
         'add-csv=s'      => sub { _add_csv($_[1]) },
