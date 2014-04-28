@@ -1,5 +1,16 @@
 Revision history for App-fsql
 
+0.05    2014-04-29 (SHARYANTO)
+
+        - Add -f alias for --format.
+
+        - Add output formats 'csv', 'tsv', 'ltsv' (thanks baileych for csv/tsv).
+
+        - Add input & output format 'perl'.
+
+        - Default output format is now the most used input format.
+
+
 0.04    2014-04-22 (SHARYANTO)
 
         - Show format information in --show-schema.
