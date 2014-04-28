@@ -446,6 +446,9 @@ The value of C<perl> will format using L<Data::Format::Pretty::Perl>.
 
 Any other value will be passed to L<Perinci::Result::Format>'s C<format()>.
 
+The default value is the most used table format. So if your tables are mostly
+CSV, B<fsql> will also output CSV by default.
+
 =item * --show-schema
 
 Instead of running a query, show schema instead. This is useful for debugging.
