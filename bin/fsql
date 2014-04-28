@@ -248,7 +248,8 @@ sub parse_cmdline {
         'add-yaml=s'     => sub { _add_yaml($_[1]) },
         'add-perl=s'     => sub { _add_perl($_[1]) },
         'show-schema'    => sub { $Opts{action} = 'show-schema' },
-        'help|h'           => sub {
+        'hash!'          => \$Opts{hash},
+        'help|h'         => sub {
             print <<USAGE;
 Usage:
   fsql [OPTIONS]... [ <QUERY> | --show-schema ]
@@ -262,6 +263,7 @@ Options:
   --add-yaml=s
   --add-perl=s
   --format=s, -f
+  --hash
 For more details, see the manpage/documentation.
 USAGE
             exit 0;
@@ -335,10 +337,16 @@ sub run {
         my $sth = $dbh->prepare($query);
         $sth->execute;
         my @rows;
-        while (my $row = $sth->fetchrow_hashref) {
-            push @rows, $row;
+        if ($Opts{hash}) {
+            while (my $row = $sth->fetchrow_hashref) {
+                push @rows, $row;
+            }
+        } else {
+            while (my @row = $sth->fetchrow_array) {
+                push @rows, \@row;
+            }
         }
-        $res = [200, "OK", \@rows];
+        $res = [200, "OK", \@rows, {"table.fields" => $sth->{NAME}}];
 
     } else {
 
@@ -432,6 +440,15 @@ Like C<--add-json>, but will load file as YAML.
 =item * --add-perl=FILENAME[:TABLENAME]
 
 Like C<--add-perl>, but will load file as Perl.
+
+=item * --hash
+
+Return each row as a hash (dictionary/associated array) instead of an array.
+This is relevant to output formats like C<perl>, C<json>, C<yaml>, C<text>.
+
+Returning a hash is convenient when you want column name information on each
+row, but you can't specify the same column twice and order of columns are not
+guaranteed.
 
 =item * --format=FORMAT (default: text), -f
 
