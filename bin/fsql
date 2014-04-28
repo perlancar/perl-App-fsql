@@ -227,9 +227,7 @@ sub _add_yaml {
 
 sub parse_cmdline {
     my $res = GetOptions(
-        'format=s'       => \$Opts{format},
-        'json'           => sub { $Opts{format} = 'json' },
-        'yaml'           => sub { $Opts{format} = 'yaml' },
+        'format|f=s'     => \$Opts{format},
         'add-csv=s'      => sub { _add_csv($_[1]) },
         'add-tsv=s'      => sub { _add_tsv($_[1]) },
         'add-ltsv=s'     => sub { _add_ltsv($_[1]) },
@@ -248,7 +246,7 @@ Options:
   --add-ltsv=s
   --add-json=s
   --add-yaml=s
-  --format=s, --json, --yaml
+  --format=s, -f
 For more details, see the manpage/documentation.
 USAGE
             exit 0;
@@ -393,7 +391,7 @@ L<Perinci::CmdLine>-based programs.
 
 Like C<--add-json>, but will load file as YAML.
 
-=item * --format=FORMAT (default: text)
+=item * --format=FORMAT (default: text), -f
 
 Set output format. The value C<csv> or C<tsv> will cause query results
 to be output as a comma-separated or TAB-separated list, respectively.
@@ -402,14 +400,6 @@ silently converted to C<text> if C<--show-schema> is also present.
 
 Any other value will be passed to L<Perinci::Result::Format>'s
 C<format()>.
-
-=item * --json
-
-Equivalent to C<--format json>.
-
-=item * --yaml
-
-Equivalent to C<--format yaml>.
 
 =item * --show-schema
 
