@@ -292,7 +292,7 @@ sub run {
             $Tables{$t}{columns} = [split /,/, $line1];
         }
         $res = [200, "OK", {tables => \%Tables}];
-	$Opts{format} = 'text' if $Opts{format} =~ /[ct]sv/;
+	$Opts{format} = 'text' if $Opts{format} =~ /^(c|t|lt)sv$/;
 
     } elsif ($Opts{action} eq 'query') {
         unless (@ARGV) {
@@ -336,9 +336,15 @@ sub run {
 sub show_result {
     my $res = shift;
 
-    if ($Opts{format} =~ /[ct]sv/) {
+    if ($Opts{format} =~ /^[ct]sv$/) {
         csv(in => $res->[2], out => *STDOUT,
 	    sep_char => $Opts{format} eq 'tsv' ? "\t" : ',');
+    } elsif ($Opts{format} eq 'ltsv') {
+        # Text::LTSV expects a format of [[k=>v, k2=>v2, ...], ...]. we might as
+        # well print it ourselves.
+        for my $row (@{ $res->[2] }) {
+            say join("\t", map {"$_:$row->{$_}"} sort keys %$row);
+        }
     } else {
         print Perinci::Result::Format::format($res, $Opts{format});
     }
@@ -406,13 +412,13 @@ Like C<--add-json>, but will load file as YAML.
 
 =item * --format=FORMAT (default: text), -f
 
-Set output format. The value C<csv> or C<tsv> will cause query results
-to be output as a comma-separated or TAB-separated list, respectively.
-As this isn't very useful for a schema listing, these values will be
-silently converted to C<text> if C<--show-schema> is also present.
+Set output format. The value C<csv> or C<tsv> or C<ltsv> will cause query
+results to be output as a comma-separated or TAB-separated list or labeled-TAB
+separated list, respectively. As this isn't very useful for a schema listing,
+these values will be silently converted to C<text> if C<--show-schema> is also
+present.
 
-Any other value will be passed to L<Perinci::Result::Format>'s
-C<format()>.
+Any other value will be passed to L<Perinci::Result::Format>'s C<format()>.
 
 =item * --show-schema
 
