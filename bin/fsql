@@ -227,7 +227,7 @@ sub _add_yaml {
 
 sub parse_cmdline {
     my $res = GetOptions(
-        'format'         => \$Opts{format},
+        'format=s'       => \$Opts{format},
         'json'           => sub { $Opts{format} = 'json' },
         'yaml'           => sub { $Opts{format} = 'yaml' },
         'add-csv=s'      => sub { _add_csv($_[1]) },
@@ -286,6 +286,7 @@ sub run {
             $Tables{$t}{columns} = [split /,/, $line1];
         }
         $res = [200, "OK", {tables => \%Tables}];
+	$Opts{format} = 'text' if $Opts{format} =~ /[ct]sv/;
 
     } elsif ($Opts{action} eq 'query') {
         unless (@ARGV) {
@@ -323,7 +324,13 @@ sub run {
 
     }
 
-    print Perinci::Result::Format::format($res, $Opts{format});
+    if ($Opts{format} =~ /[ct]sv/) {
+        csv(in => $res->[2], out => *STDOUT,
+	    sep_char => $Opts{format} eq 'tsv' ? "\t" : ',');
+    }
+    else {
+        print Perinci::Result::Format::format($res, $Opts{format});
+    }
 }
 
 # MAIN
@@ -388,7 +395,12 @@ Like C<--add-json>, but will load file as YAML.
 
 =item * --format=FORMAT (default: text)
 
-Set output format. This will be passed to L<Perinci::Result::Format>'s
+Set output format. The value C<csv> or C<tsv> will cause query results
+to be output as a comma-separated or TAB-separated list, respectively.
+As this isn't very useful for a schema listing, these values will be
+silently converted to C<text> if C<--show-schema> is also present.
+
+Any other value will be passed to L<Perinci::Result::Format>'s
 C<format()>.
 
 =item * --json
