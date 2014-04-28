@@ -360,13 +360,13 @@ sub run {
 sub show_result {
     my $res = shift;
 
+    my $ff = $res->[3]{"table.fields"};
     if ($Opts{format} =~ /^[ct]sv$/) {
-        csv(in => $res->[2], out => *STDOUT,
+        csv(in => $res->[2], headers => $ff, out => *STDOUT,
 	    sep_char => $Opts{format} eq 'tsv' ? "\t" : ',');
     } elsif ($Opts{format} eq 'ltsv') {
         # Text::LTSV expects a format of [[k=>v, k2=>v2, ...], ...]. we might as
         # well print it ourselves.
-        my $ff = $res->[3]{"table.fields"};
         for my $row (@{ $res->[2] }) {
             if (ref($row) eq 'HASH') {
                 say join("\t", map {"$_:".($row->{$_} // '')} @$ff);
