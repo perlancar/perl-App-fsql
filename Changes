@@ -1,5 +1,15 @@
 Revision history for App-fsql
 
+0.06    2014-04-29 (SHARYANTO)
+
+        [INCOMPATIBLE CHANGES]
+
+        - By default outputs array of arrays (fetchrow_arrayref) instead array
+          of hashes (fetchrow_hashref) to get consistent column ordering. Old
+          behavior is possible using the new --hash option. This only affects
+          outputs like 'json', 'yaml', 'perl', 'text'.
+
+
 0.05    2014-04-29 (SHARYANTO)
 
         - Add -f alias for --format.
