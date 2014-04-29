@@ -14,6 +14,7 @@ use Text::CSV_XS qw(csv);
 my %Opts = (
     format => undef,
     action => 'query',
+    hash   => 0,
 );
 my %Tables;
 
@@ -315,7 +316,8 @@ sub parse_cmdline {
         'add-yaml=s'     => sub { _add_yaml($_[1]) },
         'add-perl=s'     => sub { _add_perl($_[1]) },
         'show-schema'    => sub { $Opts{action} = 'show-schema' },
-        'hash!'          => \$Opts{hash},
+        'aoh'            => sub { $Opts{hash} = 1 },
+        'aoa'            => sub { $Opts{hash} = 0 },
         'help|h'         => sub {
             print <<USAGE;
 Usage:
@@ -331,7 +333,7 @@ Options:
   --add-yaml=s
   --add-perl=s
   --format=s, -f
-  --hash
+  --aoh, --aoa
 For more details, see the manpage/documentation.
 USAGE
             exit 0;
@@ -358,7 +360,6 @@ USAGE
 
 sub run {
     require DBI;
-    require Perinci::Result::Format;
 
     my $res;
 
@@ -447,9 +448,19 @@ sub show_result {
         }
     } elsif ($Opts{format} eq 'perl') {
         require Data::Format::Pretty::Perl;
-        print Data::Format::Pretty::Perl::format_pretty($res);
+        print Data::Format::Pretty::Perl::format_pretty($res->[2]);
+    } elsif ($Opts{format} eq 'json') {
+        require Data::Format::Pretty::JSON;
+        print Data::Format::Pretty::JSON::format_pretty($res->[2]);
+    } elsif ($Opts{format} eq 'text') {
+        require Data::Format::Pretty::Console;
+        print Data::Format::Pretty::Console::format_pretty($res->[2]);
+    } elsif ($Opts{format} eq 'yaml') {
+        require Data::Format::Pretty::YAML;
+        print Data::Format::Pretty::YAML::format_pretty($res->[2]);
     } else {
-        print Perinci::Result::Format::format($res, $Opts{format});
+        die "fsql: Invalid output format, please see documentation ".
+            "for known output formats\n";
     }
 }
 
@@ -476,7 +487,7 @@ Filter CSV (table from stdin is aptly named so):
 Pick output format, produce array of hashes instead of the default array of
 arrays:
 
- % fsql -a ~/book.pl 'SELECT title,name FROM book WHERE year>=2010' --hash -f json
+ % fsql -a ~/book.pl 'SELECT title,name FROM book WHERE year>=2010' --aoh -f json
 
 You can perform joins, of course:
 
@@ -543,10 +554,16 @@ Like C<--add-json>, but will load file as YAML.
 
 Like C<--add-perl>, but will load file as Perl.
 
-=item * --hash
+=item * --aoa
 
-Return each row as a hash (dictionary/associated array) instead of an array.
-This is relevant to output formats like C<perl>, C<json>, C<yaml>, C<text>.
+Return array of array (the default). Only relevant to outputs like C<perl>,
+C<json>, C<yaml>, C<text>.
+
+=item * --aoh
+
+Return array of hashes instead of the default array of array, where each row is
+represented as a hash (dictionary/associated array) instead of an array. Only
+relevant to output formats like C<perl>, C<json>, C<yaml>, C<text>.
 
 Returning a hash is convenient when you want column name information on each
 row, but you can't specify the same column twice and order of columns are not
@@ -561,9 +578,8 @@ comma-separated or TAB-separated list or labeled-TAB separated list,
 respectively. As this isn't very useful for a schema listing, these values will
 be silently converted to C<text> if C<--show-schema> is also present.
 
-The value of C<perl> will format using L<Data::Format::Pretty::Perl>.
-
-Any other value will be passed to L<Perinci::Result::Format>'s C<format()>.
+The other values C<perl>, C<json>, C<yaml>, and C<text> will be formatted using
+appropriate L<Data::Format::Pretty> formatter.
 
 The default value is the most used table format. So if your tables are mostly
 CSV, B<fsql> will also output CSV by default.
