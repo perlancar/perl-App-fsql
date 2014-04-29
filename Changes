@@ -1,8 +1,22 @@
 Revision history for App-fsql
 
+0.08    2014-04-29 (SHARYANTO)
+
+        [INCOMPATIBLE CHANGES]
+
+        - For outputs 'json', 'yaml', 'perl', display naked instead of enveloped
+          result. This should make fsql more usable in general. Use
+          Data::Format::Pretty::* modules directly instead of
+          Perinci::Result::Format.
+
+        - Rename --hash to --aoh. Add --aoa for completeness.
+
+
 0.07    2014-04-29 (SHARYANTO)
 
         - Add --add (-a) option.
+
+        - Add --hash option.
 
         - Add some tests.
 
