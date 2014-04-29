@@ -88,6 +88,18 @@ subtest "option --hash" => sub {
     );
 };
 
+subtest "option --show-schema" => sub {
+    test_fsql(
+        argv     => ["--add-yaml", "$Bin/data/1.yaml:t1", "--add-perl", "$Bin/data/1.pl:t2", "--show-schema", "-f", "perl"],
+        posttest => sub {
+            my $res = shift;
+            my $envres = eval($res->{stdout});
+            ok($envres->[2]{tables}{t1});
+            ok($envres->[2]{tables}{t2});
+        },
+    );
+};
+
 DONE_TESTING:
 done_testing;
 if (Test::More->builder->is_passing) {
