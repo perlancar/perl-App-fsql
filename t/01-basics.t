@@ -77,6 +77,60 @@ subtest "option --add-perl" => sub {
     );
 };
 
+subtest "option --add" => sub {
+    write_file("$tmpdir/t901", "c1,c2\n1,2\n");
+    write_file("$tmpdir/t902", "c1\tc2\n1\t2\n");
+    write_file("$tmpdir/t903", "c1:1\tc2:2\n");
+    write_file("$tmpdir/t904", '[{"c1":1,"c2":2}]');
+    write_file("$tmpdir/t905", "[[foo, bar]]\n");
+    write_file("$tmpdir/t906", "[{c1=>1, c2=>2}]");
+
+    test_fsql(
+        argv     => [
+            "-a", "$Bin/data/1.csv:t1",
+            "-a", "$Bin/data/1.tsv:t2",
+            "-a", "$Bin/data/1.ltsv:t3",
+            "-a", "$Bin/data/1.json:t4",
+            "-a", "$Bin/data/1.yaml:t5",
+            "-a", "$Bin/data/1.pl:t6",
+
+            # test autodetect
+            "-a", "$tmpdir/t901",
+            "-a", "$tmpdir/t902",
+            "-a", "$tmpdir/t903",
+            "-a", "$tmpdir/t904",
+            "-a", "$tmpdir/t905",
+            "-a", "$tmpdir/t906",
+
+            "--show-schema", "-f", "perl",
+        ],
+        posttest => sub {
+            my $res = shift;
+            my $envres = eval $res->{stdout};
+
+            is($envres->[2]{tables}{t1}{fmt}, 'csv');
+            is($envres->[2]{tables}{t2}{fmt}, 'tsv');
+            is($envres->[2]{tables}{t3}{fmt}, 'ltsv');
+            is($envres->[2]{tables}{t4}{fmt}, 'json');
+            is($envres->[2]{tables}{t5}{fmt}, 'yaml');
+            is($envres->[2]{tables}{t6}{fmt}, 'perl');
+
+            is($envres->[2]{tables}{t901}{fmt}, 'csv');
+            is($envres->[2]{tables}{t902}{fmt}, 'tsv');
+            is($envres->[2]{tables}{t903}{fmt}, 'ltsv');
+            is($envres->[2]{tables}{t904}{fmt}, 'json');
+            is($envres->[2]{tables}{t905}{fmt}, 'yaml');
+            is($envres->[2]{tables}{t906}{fmt}, 'perl');
+
+            is($envres->[2]{tables}{t1}{fmt}, 'csv');
+            is($envres->[2]{tables}{t1}{fmt}, 'csv');
+        },
+    );
+
+    # XXX test can't autodetect
+
+};
+
 subtest "option --hash" => sub {
     test_fsql(
         argv     => ["--hash", "--add-perl", "$Bin/data/1.pl:t", q(SELECT col1 FROM t WHERE col__2 <= 2)],

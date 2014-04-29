@@ -38,112 +38,187 @@ sub _prepare_tempdir {
     return $tempdir;
 }
 
-sub _check_add_arg {
-    my $arg = shift;
+# parse filename and tablename from arg, copy stdin to tempfile
+sub _preprocess_arg {
+    my ($arg, $opts) = @_;
+
+    $opts->{copy_stdin_to_tempfile} //= 1;
 
     state $stdin_specified;
 
-    my ($filename, $tablename);
+    my ($file, $table);
     if ($arg =~ /(.+):(.+)/) {
-        $filename  = $1;
-        $tablename = $2;
+        $file  = $1;
+        $table = $2;
     } elsif ($arg eq '-') {
-        $filename  = '-';
-        $tablename = 'stdin';
+        $file  = '-';
+        $table = 'stdin';
     } else {
-        $filename  = $arg;
-        $tablename = $filename;
-        $tablename =~ s!.+[/\\]!!; # strip path
-        $tablename =~ s!\.\w+\z!!; # strip filename extension
-        $tablename =~ s/[^A-Za-z_0-9]+/_/g;
+        $file  = $arg;
+        $table = $file;
+        $table =~ s!.+[/\\]!!; # strip path
+        $table =~ s!\.\w+\z!!; # strip filename extension
+        $table =~ s/[^A-Za-z_0-9]+/_/g;
     }
 
-    unless ($tablename =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/) {
-        warn "fsql: Invalid table name $tablename, ".
+    unless ($table =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/) {
+        warn "fsql: Invalid table name $table, ".
             "please use letter+alphanums only\n";
         exit 99;
     }
-    if (exists $Tables{$tablename}) {
-        warn "fsql: Duplicate table name $tablename, please use another name\n";
+    if (exists $Tables{$table}) {
+        warn "fsql: Duplicate table name $table, please use another name\n";
         exit 99;
     }
 
-    my $fh;
-    if ($filename eq '-') {
+    my ($fh, $tempfile);
+    if ($file eq '-') {
         if ($stdin_specified++) {
             warn "fsql: stdin cannot be specified more than once\n";
             exit 99;
         }
-        $fh = *STDIN;
+        if ($opts->{copy_stdin_to_tempfile}) {
+            my $tempdir = _prepare_tempdir();
+            $tempfile = "$tempdir/$table";
+            open $fh, ">", $tempfile
+                or die "fsql: Can't write to tempfile $tempfile: $!\n";
+            print $fh $_ while ($_ = <STDIN>);
+            open $fh, "<", $tempfile
+                or die "fsql: BUG: Can't reopen tempfile $tempfile: $!\n";
+        } else {
+            $fh = *STDIN;
+        }
     } else {
-        open $fh, "<", $filename
-            or die "fsql: Can't open $filename: $!\n";
+        open $fh, "<", $file
+            or die "fsql: Can't open $file: $!\n";
     }
 
-    return ($filename, $fh, $tablename);
+    return {
+        orig_file => $file,
+        file      => $tempfile // $file,
+        fh        => $fh,
+        table     => $table,
+    };
+}
+
+sub _register_table {
+    my ($arginfo, %overrides) = @_;
+    $Tables{$arginfo->{table}} = {
+        file      => $arginfo->{file},
+        orig_file => $arginfo->{orig_file},
+        fmt       => 'csv',
+        %overrides,
+    };
+}
+
+sub _add {
+    my ($arg, $arginfo) = @_;
+    $arginfo //= _preprocess_arg($arg);
+
+    # try to detect type
+    my $type;
+    {
+        if ($arginfo->{orig_file} =~ /\.(\w+)\z/) {
+            my $ext = lc $1;
+            if ($ext =~ /^csv$/) {
+                $type = 'csv'; last;
+            } elsif ($ext =~ /^tsv$/) {
+                $type = 'tsv'; last;
+            } elsif ($ext =~ /^ltsv$/) {
+                $type = 'ltsv'; last;
+            } elsif ($ext =~ /^(json|js)$/) {
+                $type = 'json'; last;
+            } elsif ($ext =~ /^ya?ml$/) {
+                $type = 'yaml'; last;
+            } elsif ($ext =~ /^(perl|pl|pm)$/) {
+                $type = 'perl'; last;
+            }
+        }
+
+        # read a few lines from file
+        my $fh = $arginfo->{fh};
+        my $i = 1;
+        my $content = '';
+        my $firstline;
+        while (<$fh>) {
+            $firstline = $_ if $i == 1;
+            $content .= $_;
+            last if ++$i > 5;
+        }
+
+        last unless defined $firstline;
+        if ($firstline =~ /\t/) {
+            if ($firstline =~ /:/) {
+                $type = 'ltsv';
+            } else {
+                $type = 'tsv';
+            }
+        } elsif ($content =~ /=>/) {
+            $type = 'perl';
+        } elsif ($content =~ /[A-Za-z_]\w*, / || # bareword element, e.g. [foo, bar]
+                     $content =~ /[A-Za-z_]\w*:\s/i) { # bareword key, e.g. [foo: bar]
+            $type = 'yaml';
+        } elsif ($content =~ /"[^"]*":\S/) { # yaml requires space
+            $type = 'json';
+        } else {
+            $type = 'csv';
+        }
+        # put file pointer back at the beginning
+        seek $arginfo->{fh}, 0, 0;
+    }
+
+    if ($type eq 'csv') {
+        _add_csv($arg, $arginfo);
+    } elsif ($type eq 'tsv') {
+        _add_tsv($arg, $arginfo);
+    } elsif ($type eq 'ltsv') {
+        _add_ltsv($arg, $arginfo);
+    } elsif ($type eq 'json') {
+        _add_json($arg, $arginfo);
+    } elsif ($type eq 'yaml') {
+        _add_yaml($arg, $arginfo);
+    } elsif ($type eq 'perl') {
+        _add_perl($arg, $arginfo);
+    } else {
+        die "fsql: Can't determine table type for '$arg'\n";
+    }
 }
 
 sub _add_csv {
-    my $arg = shift;
-    my ($filename, $fh, $tablename) = _check_add_arg($arg);
-    my $outfilename;
-    if ($filename eq '-') {
-        my $tempdir = _prepare_tempdir();
-        $outfilename = "$tempdir/$tablename";
-        open my($fh), ">", $outfilename
-            or die "fsql: Can't write to $outfilename: $!\n";
-        print $fh $_ while <$fh>;
-    } else {
-        $outfilename = $filename;
-    }
-
-    $Tables{$tablename} = {
-        file      => $outfilename,
-        orig_file => $filename,
-        fmt       => 'csv',
-    };
+    my ($arg, $arginfo) = @_;
+    $arginfo //= _preprocess_arg($arg);
+    _register_table($arginfo);
 }
 
 sub _add_tsv {
-    my $arg = shift;
-    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+    my ($arg, $arginfo) = @_;
+    $arginfo //= _preprocess_arg($arg);
 
     my $tempdir = _prepare_tempdir();
-
-    my $outfile;
-    my $aoa = csv(in => $filename, sep_char=>"\t");
-    my $outfilename = "$tempdir/$tablename";
-    csv(in => $aoa, out=>"$tempdir/$tablename");
-    $Tables{$tablename} = {
-        file      => $outfilename,
-        orig_file => $filename,
-        fmt       => 'tsv',
-    };
+    my $aoa = csv(in => $arginfo->{file}, sep_char=>"\t");
+    my $outfile = "$tempdir/$arginfo->{table}";
+    csv(in => $aoa, out=>$outfile);
+    _register_table($arginfo, file=>$outfile, fmt=>'tsv');
 }
 
 sub _add_ltsv {
     require Text::LTSV;
 
-    my $arg = shift;
-    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+    my ($arg, $arginfo) = @_;
+    $arginfo //= _preprocess_arg($arg);
 
     my $tempdir = _prepare_tempdir();
-
     my $ltsv = Text::LTSV->new;
-    my $aoh  = $ltsv->parse_file($fh);
-    my $outfilename = "$tempdir/$tablename";
-    csv(in => $aoh, out => $outfilename);
-    $Tables{$tablename} = {
-        file      => $outfilename,
-        orig_file => $filename,
-        fmt       => 'ltsv',
-    };
+    my $aoh = $ltsv->parse_file($arginfo->{fh});
+    my $outfile = "$tempdir/$arginfo->{table}";
+    csv(in => $aoh, out => $outfile);
+    _register_table($arginfo, file=>$outfile, fmt=>'ltsv');
 }
 
 sub _res_to_csv {
     require Perinci::Result::Util;
 
-    my ($res, $filename, $tablename, $fmt) = @_;
+    my ($res, $arginfo, $fmt) = @_;
     my $tf;
     if (Perinci::Result::Util::is_env_res($res)) {
         $tf = $res->[3]{"table.fields"}
@@ -152,17 +227,17 @@ sub _res_to_csv {
     }
 
     unless (ref($res) eq 'ARRAY') {
-        warn "fsql: Data is not an array: $filename\n";
+        warn "fsql: Data is not an array: $arginfo->{file}\n";
         exit 99;
     }
 
     my $tempdir = _prepare_tempdir();
-    my $outfilename = "$tempdir/$tablename";
+    my $outfile = "$tempdir/$arginfo->{table}";
 
     # handle special case of zero rows
     unless (@$res) {
         csv(in => [], headers => $tf ? $tf : ["column0"],
-            out => $outfilename);
+            out => $outfile);
         goto END;
     }
 
@@ -171,7 +246,7 @@ sub _res_to_csv {
     # handle another special case of array of scalars
     unless (ref($row0) eq 'ARRAY' || ref($row0) eq 'HASH') {
         csv(in => [map {[$_]} @$res], headers=>["column0"],
-            out => $outfilename);
+            out => $outfile);
         goto END;
     }
 
@@ -180,67 +255,59 @@ sub _res_to_csv {
         $tf = [map {"column$_"} 0..@$row0-1];
     }
 
-    csv(in=>$res, headers=>$tf, out=>$outfilename);
+    csv(in=>$res, headers=>$tf, out=>$outfile);
 
   END:
-    $Tables{$tablename} = {
-        file      => $outfilename,
-        orig_file => $filename,
-        fmt       => $fmt,
-    };
+    _register_table($arginfo, file => $outfile, fmt => $fmt);
 }
 
 sub _add_json {
     require JSON;
 
-    my $arg = shift;
-    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+    my ($arg, $arginfo) = @_;
+    $arginfo //= _preprocess_arg($arg, {copy_stdin_to_tempfile=>0});
 
     state $json = JSON->new->allow_nonref;
     my $res;
     {
         local $/;
+        my $fh = $arginfo->{fh}; # perl's diamond syntax limitation
         my $content = <$fh>;
         $res = $json->decode($content);
     }
-    _res_to_csv($res, $filename, $tablename, 'json');
+    _res_to_csv($res, $arginfo, 'json');
 }
 
 sub _add_yaml {
     require YAML::XS;
 
-    my $arg = shift;
-    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+    my ($arg, $arginfo) = @_;
+    $arginfo //= _preprocess_arg($arg);
 
     # YAML::XS::LoadFile doesn't accept filehandle
-    my $res;
-    if ($filename eq '-') {
-        local $/;
-        my $content = <$fh>;
-        $res = YAML::XS::Load($content);
-    } else {
-        $res = YAML::XS::LoadFile($filename);
-    }
-    _res_to_csv($res, $filename, $tablename, 'yaml');
+    my $res = YAML::XS::LoadFile($arginfo->{file});
+    _res_to_csv($res, $arginfo, 'yaml');
 }
 
 sub _add_perl {
-    my $arg = shift;
-    my ($filename, $fh, $tablename) = _check_add_arg($arg);
+    my ($arg, $arginfo) = @_;
+    $arginfo //= _preprocess_arg($arg, {copy_stdin_to_tempfile=>0});
 
     my $res;
     {
         local $/;
+        my $fh = $arginfo->{fh};
         my $content = <$fh>;
         $res = eval $content;
         die if $@;
     }
-    _res_to_csv($res, $filename, $tablename, 'perl');
+    _res_to_csv($res, $arginfo, 'perl');
 }
 
 sub parse_cmdline {
     my $res = GetOptions(
         'format|f=s'     => \$Opts{format},
+        'add|a=s'        => sub { _add($_[1]) },
         'add-csv=s'      => sub { _add_csv($_[1]) },
         'add-tsv=s'      => sub { _add_tsv($_[1]) },
         'add-ltsv=s'     => sub { _add_ltsv($_[1]) },
@@ -256,6 +323,7 @@ Usage:
   fsql --help
   fsql --version
 Options:
+  --add=s
   --add-csv=s
   --add-tsv=s
   --add-ltsv=s
@@ -276,7 +344,7 @@ USAGE
     );
     exit 99 if !$res;
     unless (keys %Tables) {
-        _add_json("-");
+        _add("-");
     }
 
     # pick default format from the most used input format
@@ -307,7 +375,10 @@ sub run {
                 or die "fsql: Can't open $Tables{$t}{file}: $!\n";
             my $line1 = <$fh>;
             $line1 =~ s/\r?\n//;
-            $Tables{$t}{columns} = [split /,/, $line1];
+            $Tables{$t}{columns} = [
+                # XXX we should perhaps ask DBD::CSV directly
+                map {s/\A"(.*)"\z/$1/; s/\W/_/g; lc $_}
+                    split /,/, $line1];
         }
         $res = [200, "OK", {tables => \%Tables}];
 	$Opts{format} = 'text' if $Opts{format} =~ /^(c|t|lt)sv$/;
@@ -376,7 +447,7 @@ sub show_result {
         }
     } elsif ($Opts{format} eq 'perl') {
         require Data::Format::Pretty::Perl;
-        print Data::Format::Pretty::Perl::format_pretty($res->[2]);
+        print Data::Format::Pretty::Perl::format_pretty($res);
     } else {
         print Perinci::Result::Format::format($res, $Opts{format});
     }
@@ -396,21 +467,47 @@ run();
  fsql [OPTIONS] [ <QUERY> | --show-schema ]
 
 
+=head1 EXAMPLES
+
+Filter CSV (table from stdin is aptly named so):
+
+ % prog-that-produces-csv | fsql 'SELECT id,name FROM stdin WHERE id<=1000' > final.csv
+
+Pick output format, produce array of hashes instead of the default array of
+arrays:
+
+ % fsql -a ~/book.pl 'SELECT title,name FROM book WHERE year>=2010' --hash -f json
+
+You can perform joins, of course:
+
+ % fsql -a t.json -a 2.csv:t2 'SELECT * FROM t1 LEFT JOIN t2 ON t1.uid=t2.id'
+
+Show schema:
+
+ % fsql -a table1.json -a 2.csv:table2 --show-schema
+
+
 =head1 DESCRIPTION
 
 B<fsql> lets you perform SQL queries against "flat" files of various formats.
 Each file will be regarded as a SQL table. The magic of all this is performed by
 L<DBD::CSV> and L<SQL::Statement>.
 
-There must be at least one table specified (with one of the C<--add-*> options).
-If none of those options are specified, a JSON table is assumed in STDIN and
-table name C<stdin> (if you want to change the table name, you can use
-C<--add-json -:somename>.
+There must be at least one table specified (with C<--add> or one of the
+C<--add-TYPE> options). If none of those options are specified, a table is
+assumed in STDIN with name C<stdin>.
 
 
 =head1 OPTIONS
 
 =over
+
+=item * --add=FILENAME[:TABLENAME], -a
+
+Add a table from a file. Type will be detected from filename extension (and some
+heuristics, if unspecified). Die if type cannot be detected.
+
+Alternatively, you can use one of the C<--add-TYPE> options to add
 
 =item * --add-csv=FILENAME[:TABLENAME]
 
