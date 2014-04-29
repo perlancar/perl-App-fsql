@@ -554,7 +554,7 @@ Like C<--add-json>, but will load file as YAML.
 
 =item * --add-perl=FILENAME[:TABLENAME]
 
-Like C<--add-perl>, but will load file as Perl.
+Like C<--add-json>, but will load file as Perl.
 
 =item * --aoa
 
