@@ -50,7 +50,7 @@ subtest "option --add-json" => sub {
 
             my $res = shift;
             is_deeply(JSON->new->decode($res->{stdout}),
-                      [200,"OK",[["a"],["b"]],{"table.fields"=>["col1"]}]);
+                      [["a"],["b"]]);
         },
     );
 };
@@ -62,7 +62,7 @@ subtest "option --add-yaml" => sub {
 
             my $res = shift;
             is_deeply(YAML::XS::Load($res->{stdout}),
-                      [200,"OK",[["a"],["b"]],{"table.fields"=>["col1"]}]);
+                      [["a"],["b"]]);
         },
     );
 };
@@ -72,7 +72,7 @@ subtest "option --add-perl" => sub {
         posttest => sub {
             my $res = shift;
             is_deeply(eval($res->{stdout}),
-                      [200,"OK",[["a"],["b"]],{"table.fields"=>["col1"]}]);
+                      [["a"],["b"]]);
         },
     );
 };
@@ -105,25 +105,25 @@ subtest "option --add" => sub {
             "--show-schema", "-f", "perl",
         ],
         posttest => sub {
-            my $res = shift;
-            my $envres = eval $res->{stdout};
+            my $res0 = shift;
+            my $res = eval $res0->{stdout};
 
-            is($envres->[2]{tables}{t1}{fmt}, 'csv');
-            is($envres->[2]{tables}{t2}{fmt}, 'tsv');
-            is($envres->[2]{tables}{t3}{fmt}, 'ltsv');
-            is($envres->[2]{tables}{t4}{fmt}, 'json');
-            is($envres->[2]{tables}{t5}{fmt}, 'yaml');
-            is($envres->[2]{tables}{t6}{fmt}, 'perl');
+            is($res->{tables}{t1}{fmt}, 'csv');
+            is($res->{tables}{t2}{fmt}, 'tsv');
+            is($res->{tables}{t3}{fmt}, 'ltsv');
+            is($res->{tables}{t4}{fmt}, 'json');
+            is($res->{tables}{t5}{fmt}, 'yaml');
+            is($res->{tables}{t6}{fmt}, 'perl');
 
-            is($envres->[2]{tables}{t901}{fmt}, 'csv');
-            is($envres->[2]{tables}{t902}{fmt}, 'tsv');
-            is($envres->[2]{tables}{t903}{fmt}, 'ltsv');
-            is($envres->[2]{tables}{t904}{fmt}, 'json');
-            is($envres->[2]{tables}{t905}{fmt}, 'yaml');
-            is($envres->[2]{tables}{t906}{fmt}, 'perl');
+            is($res->{tables}{t901}{fmt}, 'csv');
+            is($res->{tables}{t902}{fmt}, 'tsv');
+            is($res->{tables}{t903}{fmt}, 'ltsv');
+            is($res->{tables}{t904}{fmt}, 'json');
+            is($res->{tables}{t905}{fmt}, 'yaml');
+            is($res->{tables}{t906}{fmt}, 'perl');
 
-            is($envres->[2]{tables}{t1}{fmt}, 'csv');
-            is($envres->[2]{tables}{t1}{fmt}, 'csv');
+            is($res->{tables}{t1}{fmt}, 'csv');
+            is($res->{tables}{t1}{fmt}, 'csv');
         },
     );
 
@@ -131,13 +131,13 @@ subtest "option --add" => sub {
 
 };
 
-subtest "option --hash" => sub {
+subtest "option --aoh" => sub {
     test_fsql(
-        argv     => ["--hash", "--add-perl", "$Bin/data/1.pl:t", q(SELECT col1 FROM t WHERE col__2 <= 2)],
+        argv     => ["--aoh", "--add-perl", "$Bin/data/1.pl:t", q(SELECT col1 FROM t WHERE col__2 <= 2)],
         posttest => sub {
             my $res = shift;
             is_deeply(eval($res->{stdout}),
-                      [200,"OK",[{col1=>"a"},{col1=>"b"}],{"table.fields"=>["col1"]}]);
+                      [{col1=>"a"},{col1=>"b"}]);
         },
     );
 };
@@ -146,10 +146,10 @@ subtest "option --show-schema" => sub {
     test_fsql(
         argv     => ["--add-yaml", "$Bin/data/1.yaml:t1", "--add-perl", "$Bin/data/1.pl:t2", "--show-schema", "-f", "perl"],
         posttest => sub {
-            my $res = shift;
-            my $envres = eval($res->{stdout});
-            ok($envres->[2]{tables}{t1});
-            ok($envres->[2]{tables}{t2});
+            my $res0 = shift;
+            my $res = eval($res0->{stdout});
+            ok($res->{tables}{t1});
+            ok($res->{tables}{t2});
         },
     );
 };
