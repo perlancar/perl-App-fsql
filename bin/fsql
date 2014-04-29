@@ -482,12 +482,12 @@ run();
 
 Filter CSV (table from stdin is aptly named so):
 
- % prog-that-produces-csv | fsql 'SELECT id,name FROM stdin WHERE id<=1000' > final.csv
+ % prog-that-produces-csv | fsql 'SELECT id,name FROM stdin WHERE id <= 1000' > final.csv
 
 Pick output format, produce array of hashes instead of the default array of
 arrays:
 
- % fsql -a ~/book.pl 'SELECT title,name FROM book WHERE year>=2010' --aoh -f json
+ % fsql -a ~/book.pl 'SELECT title,name FROM book WHERE year >= 2010' --aoh -f json
 
 You can perform joins, of course:
 
