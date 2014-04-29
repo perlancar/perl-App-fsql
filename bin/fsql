@@ -516,9 +516,11 @@ assumed in STDIN with name C<stdin>.
 =item * --add=FILENAME[:TABLENAME], -a
 
 Add a table from a file. Type will be detected from filename extension (and some
-heuristics, if unspecified). Die if type cannot be detected.
+heuristics, if there is no file extension or extension is unrecognized). Die if
+type cannot be detected.
 
-Alternatively, you can use one of the C<--add-TYPE> options to add
+Sometimes the detection will miss. Alternatively, you can use one of the
+C<--add-TYPE> options to add a specific table type.
 
 =item * --add-csv=FILENAME[:TABLENAME]
 
