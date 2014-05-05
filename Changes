@@ -1,5 +1,13 @@
 Revision history for App-fsql
 
+0.09    2014-05-05 (SHARYANTO)
+
+        - No functional changes.
+
+        - [build] Bump required version of IPC::Cmd (to first version which has
+          run_forked()).
+
+
 0.08    2014-04-29 (SHARYANTO)
 
         [INCOMPATIBLE CHANGES]
