@@ -1,5 +1,12 @@
 Revision history for App-fsql
 
+0.10    2014-05-17 (SHARYANTO)
+
+        - No functional changes.
+
+        - Replace File::Slurp with File::Slurp::Tiny.
+
+
 0.09    2014-05-05 (SHARYANTO)
 
         - No functional changes.
