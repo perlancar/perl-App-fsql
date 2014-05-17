@@ -6,7 +6,7 @@ use warnings;
 use FindBin '$Bin';
 
 use File::chdir;
-use File::Slurp;
+use File::Slurp::Tiny qw(write_file);
 use File::Temp qw(tempdir);
 use IPC::Cmd qw(run_forked);
 use String::ShellQuote;
