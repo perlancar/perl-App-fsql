@@ -168,6 +168,7 @@ sub _add {
         seek $arginfo->{fh}, 0, 0;
     }
 
+    $type //= "";
     if ($type eq 'csv') {
         _add_csv($arg, $arginfo);
     } elsif ($type eq 'tsv') {
