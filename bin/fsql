@@ -316,15 +316,15 @@ sub parse_cmdline {
         'add-json=s'     => sub { _add_json($_[1]) },
         'add-yaml=s'     => sub { _add_yaml($_[1]) },
         'add-perl=s'     => sub { _add_perl($_[1]) },
-        'show-schema'    => sub { $Opts{action} = 'show-schema' },
+        'show-schema|s'  => sub { $Opts{action} = 'show-schema' },
         'aoh'            => sub { $Opts{hash} = 1 },
         'aoa'            => sub { $Opts{hash} = 0 },
         'help|h'         => sub {
             print <<USAGE;
 Usage:
-  fsql [OPTIONS]... [ <QUERY> | --show-schema ]
-  fsql --help
-  fsql --version
+  fsql [OPTIONS]... [ <QUERY> | --show-schema|-s ]
+  fsql --help|h
+  fsql --version|-v
 Options:
   --add=s
   --add-csv=s
