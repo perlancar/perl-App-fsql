@@ -1,5 +1,11 @@
 Revision history for App-fsql
 
+0.12    2014-12-03 (PERLANCAR)
+
+	- Add short alias -s for --show-schema because it turns out to be
+	  used quite often.
+
+
 0.11    2014-07-02 (SHARYANTO)
 
         - No functional changes.
