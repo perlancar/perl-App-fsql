@@ -476,7 +476,7 @@ run();
 
 =head1 SYNOPSIS
 
- fsql [OPTIONS] [ <QUERY> | --show-schema ]
+ fsql [OPTIONS] [ <QUERY> | --show-schema|-s ]
 
 
 =head1 EXAMPLES
@@ -496,7 +496,7 @@ You can perform joins, of course:
 
 Show schema:
 
- % fsql -a table1.json -a 2.csv:table2 --show-schema
+ % fsql -a table1.json -a 2.csv:table2 -s
 
 
 =head1 DESCRIPTION
@@ -579,7 +579,7 @@ Set output format.
 The value C<csv> or C<tsv> or C<ltsv> will cause query results to be output as a
 comma-separated or TAB-separated list or labeled-TAB separated list,
 respectively. As this isn't very useful for a schema listing, these values will
-be silently converted to C<text> if C<--show-schema> is also present.
+be silently converted to C<text> if C<--show-schema> (C<-s>) is also present.
 
 The other values C<perl>, C<json>, C<yaml>, and C<text> will be formatted using
 appropriate L<Data::Format::Pretty> formatter.
@@ -587,7 +587,7 @@ appropriate L<Data::Format::Pretty> formatter.
 The default value is the most used table format. So if your tables are mostly
 CSV, B<fsql> will also output CSV by default.
 
-=item * --show-schema
+=item * --show-schema, -s
 
 Instead of running a query, show schema instead. This is useful for debugging.
 
