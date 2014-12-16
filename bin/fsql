@@ -472,7 +472,7 @@ run();
 
 1;
 # ABSTRACT: Perform SQL queries against files in CSV/TSV/LTSV/JSON/YAML formats
-# PODNAME: fsql
+# PODNAME:
 
 =head1 SYNOPSIS
 
