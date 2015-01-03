@@ -606,9 +606,4 @@ Instead of running a query, show schema instead. This is useful for debugging.
 =head1 FAQ
 
 
-=head1 TODO
-
-Allow customized CSV separator and quoting.
-
-
 =cut
