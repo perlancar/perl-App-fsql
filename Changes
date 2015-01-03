@@ -1,5 +1,12 @@
 Revision history for App-fsql
 
+0.13    2015-01-03 (PERLANCAR)
+
+	- No functional changes.
+
+	- Rebuild (generate TODO.md, testing).
+
+
 0.12    2014-12-03 (PERLANCAR)
 
 	- Add short alias -s for --show-schema because it turns out to be
