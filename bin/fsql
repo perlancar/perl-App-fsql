@@ -366,11 +366,6 @@ sub run {
 
     if ($Opts{action} eq 'show-schema') {
 
-        if (@ARGV) {
-            warn "fsql: show-schema does not require arguments\n";
-            exit 99;
-        }
-
         my $tt = {};
         for my $t (sort keys %Tables) {
             open my($fh), "<", $Tables{$t}{file}
