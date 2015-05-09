@@ -1,15 +1,15 @@
 #!perl
 
+# DATE
+# VERSION
+
 use 5.010001;
 use strict;
 use warnings;
 #use experimental 'smartmatch';
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Text::CSV_XS qw(csv);
-
-# VERSION
-# DATE
 
 my %Opts = (
     format => undef,
