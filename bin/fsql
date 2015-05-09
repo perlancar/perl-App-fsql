@@ -621,5 +621,19 @@ Instead of running a query, show schema instead. This is useful for debugging.
 
 =head1 FAQ
 
+=head2 What SQL dialect is supported? Why is SQL feature "X" not supported?
+
+See L<SQL::Statement::Syntax> for the range of supported SQL syntax. In general,
+you can do select with several kinds of joins, almost/around 100 builtin
+functions (with additional functions available from Perl modules, see next FAQ
+entry), etc.
+
+=head2 How do I define more SQL functions? Why aren't there more date/time/X functions?
+
+SQL::Statement allows loading Perl functions as SQL functions. There are several
+CPAN modules which nicely package them so you can load them from B<fsql> simply
+by using the C<-F> option, e.g. to load the YEAR() function:
+
+ % fsql -F YEAR --add-csv sometable.csv 'SELECT c1, YEAR(c2) FROM sometable ...'
 
 =cut
