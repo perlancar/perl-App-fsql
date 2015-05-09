@@ -15,6 +15,7 @@ my %Opts = (
     format => undef,
     action => 'query',
     hash   => 0,
+    functions => [],
 );
 my %Tables;
 
@@ -316,6 +317,11 @@ sub parse_cmdline {
         'add-json=s'     => sub { _add_json($_[1]) },
         'add-yaml=s'     => sub { _add_yaml($_[1]) },
         'add-perl=s'     => sub { _add_perl($_[1]) },
+        'load-function|F=s' => sub {
+            die "Invalid function name syntax '$_[1]', please use alphanums only\n"
+                unless $_[1] =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/;
+            push @{ $Opts{functions} }, uc($_[1]);
+        },
         'show-schema|s'  => sub { $Opts{action} = 'show-schema' },
         'aoh'            => sub { $Opts{hash} = 1 },
         'aoa'            => sub { $Opts{hash} = 0 },
@@ -333,6 +339,7 @@ Options:
   --add-json=s
   --add-yaml=s
   --add-perl=s
+  --load-function=s, -F
   --format=s, -f
   --aoh, --aoa
 For more details, see the manpage/documentation.
@@ -402,6 +409,14 @@ sub run {
                         keys %Tables,
                 },
             });
+
+        for my $func (@{ $Opts{functions} }) {
+            my $mod = "SQL::Statement::Function::ByName::$func";
+            (my $mod_pm = $mod) =~ s!::!/!g; $mod_pm .= ".pm";
+            require $mod_pm;
+            $dbh->do(qq{CREATE FUNCTION $func NAME "$mod\::$func"});
+        }
+
         my $sth = $dbh->prepare($query);
         $sth->execute;
         my @rows;
@@ -551,6 +566,12 @@ Like C<--add-json>, but will load file as YAML.
 =item * --add-perl=FILENAME[:TABLENAME]
 
 Like C<--add-json>, but will load file as Perl.
+
+=item * --load-function=NAME, -F
+
+Load a SQL function. This will load Perl module
+C<SQL::Statement::Function::ByName::NAME>. See CPAN for list of available
+modules.
 
 =item * --aoa
 
