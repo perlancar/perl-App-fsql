@@ -1,5 +1,10 @@
 Revision history for App-fsql
 
+0.15    2015-05-09 (PERLANCAR)
+
+	- Add option: --load-function (-F).
+
+
 0.14    2015-01-11 (PERLANCAR)
 
 	- [ux] Be less restrictive: allow arguments when -s.
