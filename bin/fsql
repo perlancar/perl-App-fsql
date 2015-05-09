@@ -642,6 +642,10 @@ you can do select with several kinds of joins, almost/around 100 builtin
 functions (with additional functions available from Perl modules, see next FAQ
 entry), etc.
 
+Also, sometimes if there is SQL parsing error, the error message is not
+immediately obvious and can be a bit confusing. That is usually a
+parsing limitation/bug within SQL::Statement.
+
 =head2 How do I define more SQL functions? Why aren't there more date/time/X functions?
 
 SQL::Statement allows loading Perl functions as SQL functions. There are several
