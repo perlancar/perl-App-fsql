@@ -1,5 +1,12 @@
 Revision history for App-fsql
 
+0.16    2015-05-09 (PERLANCAR)
+
+        - Avoid error message when performing non-SELECT queries.
+
+        - [doc] Add FAQ entry, add example for INSERT/DELETE.
+
+
 0.15    2015-05-09 (PERLANCAR)
 
 	- Add option: --load-function (-F).
