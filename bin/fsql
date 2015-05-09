@@ -419,6 +419,12 @@ sub run {
 
         my $sth = $dbh->prepare($query);
         $sth->execute;
+
+        # not SELECT query, no need to display result
+        unless ($query =~ /\A\s*SELECT\b/is) {
+            return;
+        }
+
         my @rows;
         if ($Opts{hash}) {
             while (my $row = $sth->fetchrow_hashref) {
@@ -507,6 +513,14 @@ You can perform joins, of course:
 Show schema:
 
  % fsql -a table1.json -a 2.csv:table2 -s
+
+Insert row to CSV:
+
+ % fsql -a file.csv 'INSERT INTO file VALUES (1, 2, 3)'
+
+Delete rows from CSV:
+
+ % fsql -a file.csv 'DELETE FROM file WHERE c1 < 10'
 
 
 =head1 DESCRIPTION
