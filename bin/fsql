@@ -637,7 +637,7 @@ Instead of running a query, show schema instead. This is useful for debugging.
 
 =head2 What SQL dialect is supported? Why is SQL feature "X" not supported?
 
-See L<SQL::Statement::Syntax> for the range of supported SQL syntax. In general,
+See L<SQL::Statement::Syntax> for the range of supported SQL syntax. In short,
 you can do select with several kinds of joins, almost/around 100 builtin
 functions (with additional functions available from Perl modules, see next FAQ
 entry), etc.
