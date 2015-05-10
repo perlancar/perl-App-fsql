@@ -1,5 +1,12 @@
 Revision history for App-fsql
 
+0.17    2015-05-10 (PERLANCAR)
+
+        - No functional changes.
+
+        - Tweak docs.
+
+
 0.16    2015-05-09 (PERLANCAR)
 
         - Avoid error message when performing non-SELECT queries.
