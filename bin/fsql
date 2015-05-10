@@ -525,13 +525,24 @@ Delete rows from CSV:
 
 =head1 DESCRIPTION
 
-B<fsql> lets you perform SQL queries against "flat" files of various formats.
-Each file will be regarded as a SQL table. The magic of all this is performed by
-L<DBD::CSV> and L<SQL::Statement>.
+B<fsql> lets you perform SQL queries against one or several "flat" files of
+various formats. Each file will be regarded as a SQL table. By using SQL
+queries, you can do various calculations or manipulations that are otherwise
+hard/cumbersome to do with traditional text-manipulating Unix commands like
+B<cut>, B<sort>, B<head>, B<tail>, B<uniq>, and so on. Particularly: data
+grouping, joining, or filtering with SQL expressions and functions.
 
-There must be at least one table specified (with C<--add> or one of the
-C<--add-TYPE> options). If none of those options are specified, a table is
-assumed in STDIN with name C<stdin>.
+As a bonus, you can also modify data (currently CSV only) via SQL INSERT or
+DELETE commands.
+
+The query result will then be printed out, in one of several available formats.
+
+The magic of all this is performed by L<DBD::CSV> and L<SQL::Statement>.
+
+To use C<fsql>, you must at least specify one file/table (with C<--add> or one
+of the C<--add-TYPE> options). If none of those options are specified, a table
+is assumed in STDIN with name C<stdin> and the format will be detected. You must
+also specify a SQL query.
 
 
 =head1 OPTIONS
