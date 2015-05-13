@@ -414,7 +414,12 @@ sub run {
             my $mod = "SQL::Statement::Function::ByName::$func";
             (my $mod_pm = $mod) =~ s!::!/!g; $mod_pm .= ".pm";
             require $mod_pm;
-            $dbh->do(qq{CREATE FUNCTION $func NAME "$mod\::$func"});
+            if (defined &{"$mod\::SQL_FUNCTION_$func"}) {
+                $dbh->do(qq{CREATE FUNCTION $func NAME "$mod\::SQL_FUNCTION_$func"});
+            } else {
+                # old, deprecated, will be removed someday
+                $dbh->do(qq{CREATE FUNCTION $func NAME "$mod\::$func"});
+            }
         }
 
         my $sth = $dbh->prepare($query);
