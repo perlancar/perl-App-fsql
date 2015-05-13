@@ -1,5 +1,10 @@
 Revision history for App-fsql
 
+0.18    2015-05-13 (PERLANCAR)
+
+	- Adjust with SQL::Statement::Functions::Date 0.02+.
+
+
 0.17    2015-05-10 (PERLANCAR)
 
         - No functional changes.
