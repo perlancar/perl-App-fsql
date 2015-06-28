@@ -16,6 +16,7 @@ my %Opts = (
     action => 'query',
     hash   => 0,
     functions => [],
+    function_defs => [],
 );
 my %Tables;
 
@@ -322,6 +323,16 @@ sub parse_cmdline {
                 unless $_[1] =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/;
             push @{ $Opts{functions} }, uc($_[1]);
         },
+        'define-function|D=s' => sub {
+            die "Invalid function definition syntax, please provide name:code\n"
+                unless $_[1] =~ /(.+?):(.+)/;
+            my ($name, $code) = ($1, $2);
+            die "Invalid function name syntax '$name', please use alphanums only\n"
+                unless $name =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/;
+            my $compiled_code = eval "sub { $code }";
+            die "Invalid Perl code in function definition of '$name': $@ (code is: $code)\n" if $@;
+            push @{ $Opts{function_defs} }, {name=>uc($name), code=>$compiled_code};
+        },
         'show-schema|s'  => sub { $Opts{action} = 'show-schema' },
         'aoh'            => sub { $Opts{hash} = 1 },
         'aoa'            => sub { $Opts{hash} = 0 },
@@ -340,6 +351,7 @@ Options:
   --add-yaml=s
   --add-perl=s
   --load-function=s, -F
+  --define-function=s, -D
   --format=s, -f
   --aoh, --aoa
 For more details, see the manpage/documentation.
@@ -420,6 +432,14 @@ sub run {
                 # old, deprecated, will be removed someday
                 $dbh->do(qq{CREATE FUNCTION $func NAME "$mod\::$func"});
             }
+        }
+
+        for my $entry (@{ $Opts{function_defs} }) {
+            no strict 'refs';
+            my $addr = "$entry->{code}"; $addr =~ s/CODE\(0x(.+)\)/$1/;
+            my $name = "App::fsql::SQL_FUNCTIONS::f$addr";
+            *{$name} = $entry->{code};
+            $dbh->do(qq{CREATE FUNCTION $entry->{name} NAME "$name"});
         }
 
         my $sth = $dbh->prepare($query);
@@ -602,6 +622,15 @@ Like C<--add-json>, but will load file as Perl.
 Load a SQL function. This will load Perl module
 C<SQL::Statement::Function::ByName::NAME>. See CPAN for list of available
 modules.
+
+=item * --define-function=NAME:CODE, -D
+
+Define a SQL function. You need to specify name as well as perl code that
+implements it. Perl code will be wrapped in a subroutine, it should expect the
+function argument in C<$_[2]> (for more details see
+L<SQL::Statement::Functions>). Example:
+
+ --define-function 'MONTH:$_[2] =~ /^\d{4}-(\d{2})-/ or return undef; $1+0'
 
 =item * --aoa
 
