@@ -154,6 +154,9 @@ subtest "option --show-schema" => sub {
     );
 };
 
+# XXX test --load-function
+# XXX test --define-function
+
 DONE_TESTING:
 done_testing;
 if (Test::More->builder->is_passing) {
