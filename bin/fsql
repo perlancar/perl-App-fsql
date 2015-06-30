@@ -320,7 +320,7 @@ sub parse_cmdline {
         'add-perl=s'     => sub { _add_perl($_[1]) },
         'load-function|F=s' => sub {
             die "Invalid function name syntax '$_[1]', please use alphanums only\n"
-                unless $_[1] =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/;
+                unless $_[1] =~ /\A[A-Za-z_][A-Za-z_0-9]*(:[A-Za-z_][A-Za-z_0-9]*)?\z/;
             push @{ $Opts{functions} }, uc($_[1]);
         },
         'define-function|D=s' => sub {
@@ -423,14 +423,21 @@ sub run {
             });
 
         for my $func (@{ $Opts{functions} }) {
-            my $mod = "SQL::Statement::Function::ByName::$func";
+            my ($name, $newname);
+            if ($func =~ /(.+):(.+)/) {
+                $name = $1;
+                $newname = $2;
+            } else {
+                $name = $newname = $func;
+            }
+            my $mod = "SQL::Statement::Function::ByName::$name";
             (my $mod_pm = $mod) =~ s!::!/!g; $mod_pm .= ".pm";
             require $mod_pm;
-            if (defined &{"$mod\::SQL_FUNCTION_$func"}) {
-                $dbh->do(qq{CREATE FUNCTION $func NAME "$mod\::SQL_FUNCTION_$func"});
+            if (defined &{"$mod\::SQL_FUNCTION_$name"}) {
+                $dbh->do(qq{CREATE FUNCTION $newname NAME "$mod\::SQL_FUNCTION_$name"});
             } else {
                 # old, deprecated, will be removed someday
-                $dbh->do(qq{CREATE FUNCTION $func NAME "$mod\::$func"});
+                $dbh->do(qq{CREATE FUNCTION $newname NAME "$mod\::$name"});
             }
         }
 
@@ -622,6 +629,11 @@ Like C<--add-json>, but will load file as Perl.
 Load a SQL function. This will load Perl module
 C<SQL::Statement::Function::ByName::NAME>. See CPAN for list of available
 modules.
+
+If you use C<NAME:NEWNAME>, you can load a SQL function as another name, for
+example:
+
+ -F DAYOFYEAR:DOY
 
 =item * --define-function=NAME:CODE, -D
 
