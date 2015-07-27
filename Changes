@@ -1,5 +1,11 @@
 Revision history for App-fsql
 
+0.21    2015-07-27 (PERLANCAR)
+
+	- Rename FSQL_DEBUG_KEEP_TEMPDIR to DEBUG_KEEP_TEMPDIR (which is
+	  also observed by App::depak).
+
+
 0.20    2015-06-30 (PERLANCAR)
 
 	- Support -F NAME:NEWNAME to load function as a new name.
