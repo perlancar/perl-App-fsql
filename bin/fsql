@@ -36,7 +36,7 @@ sub _prepare_tempdir {
 
     return $tempdir if $tempdir;
     $tempdir = File::Temp::tempdir(
-        CLEANUP => $ENV{FSQL_DEBUG_KEEP_TEMPDIR} ? 0:1);
+        CLEANUP => $ENV{DEBUG_KEEP_TEMPDIR} ? 0:1);
     _debug("Created tempdir: $tempdir");
     return $tempdir;
 }
@@ -688,6 +688,17 @@ Instead of running a query, show schema instead. This is useful for debugging.
 255 on I/O or SQL error.
 
 99 on command-line options or input data error.
+
+
+=head1 ENVIRONMENT
+
+=head2 DEBUG => bool
+
+If set to true, print debugging messages.
+
+=head2 DEBUG_KEEP_TEMPDIR => bool
+
+If set to true, will not cleanup tempdir.
 
 
 =head1 FAQ
