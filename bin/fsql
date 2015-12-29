@@ -717,8 +717,9 @@ parsing limitation/bug within SQL::Statement.
 =head2 How do I define more SQL functions? Why aren't there more date/time/X functions?
 
 SQL::Statement allows loading Perl functions as SQL functions. There are several
-CPAN modules which nicely package them so you can load them from B<fsql> simply
-by using the C<-F> option, e.g. to load the YEAR() function:
+CPAN modules (see the C<SQL::Statement::Function::ByName::> namespace) which
+nicely package them so you can load them from B<fsql> simply by using the C<-F>
+option, e.g. to load the YEAR() function:
 
  % fsql -F YEAR --add-csv sometable.csv 'SELECT c1, YEAR(c2) FROM sometable ...'
 
