@@ -6,7 +6,7 @@ use warnings;
 use FindBin '$Bin';
 
 use File::chdir;
-use File::Slurp::Tiny qw(write_file);
+use File::Slurper qw(write_text);
 use File::Temp qw(tempdir);
 use IPC::Cmd qw(run_forked);
 use String::ShellQuote;
@@ -78,12 +78,12 @@ subtest "option --add-perl" => sub {
 };
 
 subtest "option --add" => sub {
-    write_file("$tmpdir/t901", "c1,c2\n1,2\n");
-    write_file("$tmpdir/t902", "c1\tc2\n1\t2\n");
-    write_file("$tmpdir/t903", "c1:1\tc2:2\n");
-    write_file("$tmpdir/t904", '[{"c1":1,"c2":2}]');
-    write_file("$tmpdir/t905", "[[foo, bar]]\n");
-    write_file("$tmpdir/t906", "[{c1=>1, c2=>2}]");
+    write_text("$tmpdir/t901", "c1,c2\n1,2\n");
+    write_text("$tmpdir/t902", "c1\tc2\n1\t2\n");
+    write_text("$tmpdir/t903", "c1:1\tc2:2\n");
+    write_text("$tmpdir/t904", '[{"c1":1,"c2":2}]');
+    write_text("$tmpdir/t905", "[[foo, bar]]\n");
+    write_text("$tmpdir/t906", "[{c1=>1, c2=>2}]");
 
     test_fsql(
         argv     => [
