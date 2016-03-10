@@ -46,10 +46,10 @@ subtest "option --add-json" => sub {
     test_fsql(
         argv     => ["--add-json", "$Bin/data/1.json:t", q(SELECT col1 FROM t WHERE col__2 <= 2)],
         posttest => sub {
-            require JSON;
+            require JSON::MaybeXS;
 
             my $res = shift;
-            is_deeply(JSON->new->decode($res->{stdout}),
+            is_deeply(JSON::MaybeXS->new->decode($res->{stdout}),
                       [["a"],["b"]]);
         },
     );

@@ -266,12 +266,12 @@ sub _res_to_csv {
 }
 
 sub _add_json {
-    require JSON;
+    require JSON::MaybeXS;
 
     my ($arg, $arginfo) = @_;
     $arginfo //= _preprocess_arg($arg, {copy_stdin_to_tempfile=>0});
 
-    state $json = JSON->new->allow_nonref;
+    state $json = JSON::MaybeXS->new->allow_nonref;
     my $res;
     {
         local $/;
