@@ -1,5 +1,12 @@
 Revision history for App-fsql
 
+0.22    2016-03-10 (PERLANCAR)
+
+	- Replace File::Slurp::Tiny with File::Slurper (in tests).
+
+	- Replace JSON with JSON::MaybeXS.
+
+
 0.21    2015-07-27 (PERLANCAR)
 
 	- Rename FSQL_DEBUG_KEEP_TEMPDIR to DEBUG_KEEP_TEMPDIR (which is
