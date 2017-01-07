@@ -1,5 +1,3 @@
-Revision history for App-fsql
-
 0.22    2016-03-10 (PERLANCAR)
 
 	- Replace File::Slurp::Tiny with File::Slurper (in tests).
