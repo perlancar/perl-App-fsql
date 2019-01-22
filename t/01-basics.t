@@ -179,7 +179,7 @@ sub test_fsql {
         my $cmd = join(
             " ",
             map {shell_quote($_)}
-                ($^X, "$FindBin::Bin/../bin/fsql", @progargs));
+                ($^X, "$FindBin::Bin/../script/fsql", @progargs));
         note "cmd: $cmd";
         my $res = run_forked($cmd, \%runopts);
 
