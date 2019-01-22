@@ -1,3 +1,10 @@
+0.230   2019-01-22 (PERLANCAR)
+
+	- Support CSV/TSV that does not have header row.
+
+	- Use Getopt::Long gnu_getopt configuration.
+
+
 0.22    2016-03-10 (PERLANCAR)
 
 	- Replace File::Slurp::Tiny with File::Slurper (in tests).

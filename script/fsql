@@ -1,5 +1,7 @@
 #!perl
 
+## no critic: ControlStructures::ProhibitMutatingListFunctions
+
 # DATE
 # VERSION
 
@@ -281,7 +283,7 @@ sub _res_to_csv {
     unless (@$res) {
         csv(in => [], headers => $tf ? $tf : ["column0"],
             out => $outfile);
-        goto END;
+        goto DONE;
     }
 
     my $row0 = $res->[0];
@@ -290,7 +292,7 @@ sub _res_to_csv {
     unless (ref($row0) eq 'ARRAY' || ref($row0) eq 'HASH') {
         csv(in => [map {[$_]} @$res], headers=>["column0"],
             out => $outfile);
-        goto END;
+        goto DONE;
     }
 
     # produce headers for aoa without tf
@@ -300,7 +302,7 @@ sub _res_to_csv {
 
     csv(in=>$res, headers=>$tf, out=>$outfile);
 
-  END:
+  DONE:
     _register_table($arginfo, file => $outfile, fmt => $fmt);
 }
 
