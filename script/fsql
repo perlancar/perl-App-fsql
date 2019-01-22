@@ -43,34 +43,51 @@ sub _prepare_tempdir {
 
 # parse filename and tablename from arg, copy stdin to tempfile
 sub _preprocess_arg {
-    my ($arg, $opts) = @_;
+    my ($arg, $funcopts) = @_;
 
-    $opts->{copy_stdin_to_tempfile} //= 1;
+    $funcopts->{copy_stdin_to_tempfile} //= 1;
 
     state $stdin_specified;
 
-    my ($file, $table);
-    if ($arg =~ /(.+):(.+)/) {
+    my $file;
+    my $fileopts = {};
+    if ($arg =~ /(.+?):(.+)/) {
         $file  = $1;
-        $table = $2;
+        my $table_or_fileopts = $2;
+        if ($table_or_fileopts =~ /=/) {
+            for (split /:/, $table_or_fileopts) {
+                if (/(.+)=(.*)/) {
+                    $fileopts->{$1} = $2;
+                } else {
+                    die "Invalid option '$_', please use 'OPT=VAL' syntax";
+                }
+            }
+        } else {
+            $fileopts->{table} = $table_or_fileopts;
+        }
     } elsif ($arg eq '-') {
         $file  = '-';
-        $table = 'stdin';
+        $fileopts->{table} = 'stdin';
     } else {
         $file  = $arg;
-        $table = $file;
-        $table =~ s!.+[/\\]!!; # strip path
-        $table =~ s!\.\w+\z!!; # strip filename extension
-        $table =~ s/[^A-Za-z_0-9]+/_/g;
+    }
+    unless (defined $fileopts->{table}) {
+        $fileopts->{table} = $file;
+        for ($fileopts->{table}) {
+            s!.+[/\\]!!; # strip path
+            s!\.\w+\z!!; # strip filename extension
+            s/[^A-Za-z_0-9]+/_/g;
+        }
     }
 
-    unless ($table =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/) {
-        warn "fsql: Invalid table name $table, ".
+    unless ($fileopts->{table} =~ /\A[A-Za-z_][A-Za-z_0-9]*\z/) {
+        warn "fsql: Invalid table name $fileopts->{table}, ".
             "please use letter+alphanums only\n";
         exit 99;
     }
-    if (exists $Tables{$table}) {
-        warn "fsql: Duplicate table name $table, please use another name\n";
+    if (exists $Tables{$fileopts->{table}}) {
+        warn "fsql: Duplicate table name $fileopts->{table}, ".
+            "please use another name\n";
         exit 99;
     }
 
@@ -80,9 +97,9 @@ sub _preprocess_arg {
             warn "fsql: stdin cannot be specified more than once\n";
             exit 99;
         }
-        if ($opts->{copy_stdin_to_tempfile}) {
+        if ($funcopts->{copy_stdin_to_tempfile}) {
             my $tempdir = _prepare_tempdir();
-            $tempfile = "$tempdir/$table";
+            $tempfile = "$tempdir/$fileopts->{table}";
             open $fh, ">", $tempfile
                 or die "fsql: Can't write to tempfile $tempfile: $!\n";
             print $fh $_ while ($_ = <STDIN>);
@@ -97,10 +114,10 @@ sub _preprocess_arg {
     }
 
     return {
+        %$fileopts,
         orig_file => $file,
         file      => $tempfile // $file,
         fh        => $fh,
-        table     => $table,
     };
 }
 
@@ -191,6 +208,22 @@ sub _add {
 sub _add_csv {
     my ($arg, $arginfo) = @_;
     $arginfo //= _preprocess_arg($arg);
+    if (defined $arginfo->{header} && !$arginfo->{header}) {
+        # copy csv, add header row
+        my $tempdir = _prepare_tempdir();
+        my $csv = Text::CSV_XS->new ({ binary => 1, auto_diag => 1 });
+        open my $fhi, "<", $arginfo->{file}
+            or die "fsql: Can't open $arginfo->{file}: $!\n";
+        my $row = $csv->getline($fhi) // ["col0"];
+        my $fno = "$tempdir/$arginfo->{table}";
+        open my $fho, ">", $fno or die "fsql: Can't write to $fno: $!\n";
+        $arginfo->{file} = $fno;
+        print $fho join(",", map {"col$_"} 0..$#{$row}), "\n";
+        seek $fhi, 0, 0;
+        print $fho $_ while <$fhi>;
+        close $fhi;
+        close $fho;
+    }
     _register_table($arginfo);
 }
 
@@ -200,6 +233,12 @@ sub _add_tsv {
 
     my $tempdir = _prepare_tempdir();
     my $aoa = csv(in => $arginfo->{file}, sep_char=>"\t");
+    if (defined $arginfo->{header} && !$arginfo->{header}) {
+        # add header row
+        my $numcols = @$aoa ? @{$aoa->[0]} : 0;
+        $numcols = 1 if $numcols < 1;
+        unshift @$aoa, [map {"col$_"} 0..$numcols-1];
+    }
     my $outfile = "$tempdir/$arginfo->{table}";
     csv(in => $aoa, out=>$outfile);
     _register_table($arginfo, file=>$outfile, fmt=>'tsv');
@@ -554,6 +593,11 @@ Delete rows from CSV:
 
  % fsql -a file.csv 'DELETE FROM file WHERE c1 < 10'
 
+Input is CSV or TSV without header row (columns will be named 'col0', 'col1',
+and so on):
+
+ % fsql -a file.csv:header=0:table=t 'SELECT col1,col3 FROM t WHERE col0 <= 1000' > final.csv
+
 
 =head1 DESCRIPTION
 
@@ -581,7 +625,7 @@ also specify a SQL query.
 
 =over
 
-=item * --add=FILENAME[:TABLENAME], -a
+=item * --add=FILENAME[:TABLENAME|OPT1=VAL1:...], -a
 
 Add a table from a file. Type will be detected from filename extension (and some
 heuristics, if there is no file extension or extension is unrecognized). Die if
@@ -590,25 +634,46 @@ type cannot be detected.
 Sometimes the detection will miss. Alternatively, you can use one of the
 C<--add-TYPE> options to add a specific table type.
 
-=item * --add-csv=FILENAME[:TABLENAME]
+If C<TABLENAME> is not specified, it will be taken from C<FILENAME> (e.g. with
+filename C<foo-bar.csv>, table name will be C<foo_bar>). Will croak if duplicate
+table name is detected. Table name must match regex
+C</\A[A-Za-z_][A-Za-z_0-9]*\z/>.
 
-Add a table from a CSV file. If C<TABLENAME> is not specified, it will be taken
-from C<FILENAME> (e.g. with filename C<foo-bar.csv>, table name will be
-C<foo_bar>). C<FILENAME> can be C<-> to mean the standard input (the default
-table name will be C<stdin>). Will croak if duplicate table name is detected.
+C<FILENAME> can be C<-> to mean the standard input (the default table name will
+be C<stdin>).
 
-Table name must match regex C</\A[A-Za-z_][A-Za-z_0-9]*\z/>.
+Alternatively, you can specify table name as well as other option using the
+OPT1=VAL1:... syntax. Known options include:
 
-=item * --add-tsv=FILENAME[:TABLENAME]
+=over
+
+=item + table=TABLENAME
+
+Specify table name.
+
+=item + header=BOOL
+
+Default is 1. If set to 0, specifies that CSV/TSV file does not contain header
+row that contains column names. Column names will be C<col0>, C<col1>, C<col2>,
+and so on. Has no effect on file types other than CSV/TSV.
+
+=back
+
+=item * --add-csv=FILENAME[:TABLENAME|OPT1=VAL1:...]
+
+Add a table from a CSV file.
+
+
+=item * --add-tsv=FILENAME[:TABLENAME|OPT1=VAL1:...]
 
 Like C<--add-csv>, but will load file as TSV (tab-separated value).
 
-=item * --add-ltsv=FILENAME[:TABLENAME]
+=item * --add-ltsv=FILENAME[:TABLENAME|OPT1=VAL1:...]
 
 Like C<--add-csv>, but will load file as LTSV (labeled tab separated value, see
 L<Text::LTSV>). Names of columns will be taken from the first row.
 
-=item * --add-json=FILENAME[:TABLENAME]
+=item * --add-json=FILENAME[:TABLENAME|OPT1=VAL1:...]
 
 Like C<--add-csv>, but will load file as JSON.
 
@@ -616,11 +681,11 @@ Data can be array, or array of arrays, or array of hashes, or an enveloped
 response (see L<Rinci::function>), so it is suitable to accept piped output of
 L<Perinci::CmdLine>-based programs.
 
-=item * --add-yaml=FILENAME[:TABLENAME]
+=item * --add-yaml=FILENAME[:TABLENAME|OPT1=VAL1:...]
 
 Like C<--add-json>, but will load file as YAML.
 
-=item * --add-perl=FILENAME[:TABLENAME]
+=item * --add-perl=FILENAME[:TABLENAME|OPT1=VAL1:...]
 
 Like C<--add-json>, but will load file as Perl.
 

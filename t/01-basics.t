@@ -29,11 +29,19 @@ subtest "option --add-csv" => sub {
         argv     => ["--add-csv", "$Bin/data/1.csv:t", q(SELECT col1 FROM t WHERE col__2 <= 2)],
         output   => lines("col1","a","b"),
     );
+    test_fsql(
+        argv     => ["--add-csv", "$Bin/data/noheader.csv:table=t:header=0", q(SELECT col0 FROM t WHERE col1 <= 2)],
+        output   => lines("col0","a","b"),
+    );
 };
 subtest "option --add-tsv" => sub {
     test_fsql(
         argv     => ["--add-tsv", "$Bin/data/1.tsv:t", q(SELECT col1 FROM t WHERE col__2 <= 2)],
         output   => lines("col1","a","b"),
+    );
+    test_fsql(
+        argv     => ["--add-tsv", "$Bin/data/noheader.tsv:table=t:header=0", q(SELECT col0 FROM t WHERE col1 <= 2)],
+        output   => lines("col0","a","b"),
     );
 };
 subtest "option --add-ltsv" => sub {
