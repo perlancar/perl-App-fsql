@@ -1,76 +1,76 @@
-0.230   2019-01-22 (PERLANCAR)
+0.230   2019-01-22  Released-By: PERLANCAR
 
 	- Support CSV/TSV that does not have header row.
 
 	- Use Getopt::Long gnu_getopt configuration.
 
 
-0.22    2016-03-10 (PERLANCAR)
+0.22    2016-03-10  Released-By: PERLANCAR
 
 	- Replace File::Slurp::Tiny with File::Slurper (in tests).
 
 	- Replace JSON with JSON::MaybeXS.
 
 
-0.21    2015-07-27 (PERLANCAR)
+0.21    2015-07-27  Released-By: PERLANCAR
 
 	- Rename FSQL_DEBUG_KEEP_TEMPDIR to DEBUG_KEEP_TEMPDIR (which is
 	  also observed by App::depak).
 
 
-0.20    2015-06-30 (PERLANCAR)
+0.20    2015-06-30  Released-By: PERLANCAR
 
 	- Support -F NAME:NEWNAME to load function as a new name.
 
 
-0.19    2015-06-28 (PERLANCAR)
+0.19    2015-06-28  Released-By: PERLANCAR
 
 	- Add option: --define-function (-D).
 
 
-0.18    2015-05-13 (PERLANCAR)
+0.18    2015-05-13  Released-By: PERLANCAR
 
 	- Adjust with SQL::Statement::Functions::Date 0.02+.
 
 
-0.17    2015-05-10 (PERLANCAR)
+0.17    2015-05-10  Released-By: PERLANCAR
 
         - No functional changes.
 
         - Tweak docs.
 
 
-0.16    2015-05-09 (PERLANCAR)
+0.16    2015-05-09  Released-By: PERLANCAR
 
         - Avoid error message when performing non-SELECT queries.
 
         - [doc] Add FAQ entry, add example for INSERT/DELETE.
 
 
-0.15    2015-05-09 (PERLANCAR)
+0.15    2015-05-09  Released-By: PERLANCAR
 
 	- Add option: --load-function (-F).
 
 
-0.14    2015-01-11 (PERLANCAR)
+0.14    2015-01-11  Released-By: PERLANCAR
 
 	- [ux] Be less restrictive: allow arguments when -s.
 
 
-0.13    2015-01-03 (PERLANCAR)
+0.13    2015-01-03  Released-By: PERLANCAR
 
 	- No functional changes.
 
 	- Rebuild (generate TODO.md, testing).
 
 
-0.12    2014-12-03 (PERLANCAR)
+0.12    2014-12-03  Released-By: PERLANCAR
 
 	- Add short alias -s for --show-schema because it turns out to be
 	  used quite often.
 
 
-0.11    2014-07-02 (SHARYANTO)
+0.11    2014-07-02  Released-By: SHARYANTO
 
         - No functional changes.
 
@@ -79,14 +79,14 @@
           installing [RT#96884]
 
 
-0.10    2014-05-17 (SHARYANTO)
+0.10    2014-05-17  Released-By: SHARYANTO
 
         - No functional changes.
 
         - Replace File::Slurp with File::Slurp::Tiny.
 
 
-0.09    2014-05-05 (SHARYANTO)
+0.09    2014-05-05  Released-By: SHARYANTO
 
         - No functional changes.
 
@@ -94,7 +94,7 @@
           run_forked()).
 
 
-0.08    2014-04-29 (SHARYANTO)
+0.08    2014-04-29  Released-By: SHARYANTO
 
         [INCOMPATIBLE CHANGES]
 
@@ -106,7 +106,7 @@
         - Rename --hash to --aoh. Add --aoa for completeness.
 
 
-0.07    2014-04-29 (SHARYANTO)
+0.07    2014-04-29  Released-By: SHARYANTO
 
         - Add --add (-a) option.
 
@@ -115,7 +115,7 @@
         - Add some tests.
 
 
-0.06    2014-04-29 (SHARYANTO)
+0.06    2014-04-29  Released-By: SHARYANTO
 
         [INCOMPATIBLE CHANGES]
 
@@ -125,7 +125,7 @@
           outputs like 'json', 'yaml', 'perl', 'text'.
 
 
-0.05    2014-04-29 (SHARYANTO)
+0.05    2014-04-29  Released-By: SHARYANTO
 
         - Add -f alias for --format.
 
@@ -136,19 +136,19 @@
         - Default output format is now the most used input format.
 
 
-0.04    2014-04-22 (SHARYANTO)
+0.04    2014-04-22  Released-By: SHARYANTO
 
         - Show format information in --show-schema.
 
 
-0.03    2014-04-22 (SHARYANTO)
+0.03    2014-04-22  Released-By: SHARYANTO
 
         - No functional changes.
 
         - Fix a couple of bugs and add some missing doc.
 
 
-0.02    2014-04-17 (SHARYANTO)
+0.02    2014-04-17  Released-By: SHARYANTO
 
         [ENHANCEMENTS]
 
@@ -161,6 +161,6 @@
         - Fix a couple of bugs.
 
 
-0.01    2014-04-17 (SHARYANTO)
+0.01    2014-04-17  Released-By: SHARYANTO
 
         - First release.
