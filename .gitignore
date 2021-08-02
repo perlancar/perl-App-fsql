@@ -2,3 +2,4 @@ App-fsql-*
 .build
 *~
 nytprof*
+.DS_Store
