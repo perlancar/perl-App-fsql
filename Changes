@@ -1,3 +1,10 @@
+0.231   2021-09-10  Released-By: PERLANCAR; Urgency: low
+
+        - No functional changes.
+
+	- [doc] Mention App::tsql.
+
+
 0.230   2019-01-22  Released-By: PERLANCAR
 
 	- Support CSV/TSV that does not have header row.
