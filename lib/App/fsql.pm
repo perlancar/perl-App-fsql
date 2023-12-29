@@ -8,7 +8,7 @@ package App::fsql;
 # DIST
 
 1;
-# ABSTRACT: Perform SQL queries against files in CSV/TSV/LTSV/JSON/YAML formats
+# ABSTRACT: Perform SQL queries against {CSV/TSV/LTSV/JSON/YAML files,TableData modules}
 
 =head1 SYNOPSIS
 

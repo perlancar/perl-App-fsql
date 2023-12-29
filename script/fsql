@@ -5,7 +5,7 @@
 use 5.010001;
 use strict;
 use warnings;
-#use experimental 'smartmatch';
+use Log::ger::Screen;
 
 use Getopt::Long qw(:config gnu_getopt no_ignore_case);
 use Text::CSV_XS qw(csv);
@@ -24,24 +24,15 @@ my %Opts = (
 );
 my %Tables;
 
-our $DEBUG = $ENV{DEBUG};
-
-sub _debug {
-    my $msg = shift;
-
-    $msg .= "\n" unless $msg =~ /\n$/;
-    warn "DEBUG: $msg" if $DEBUG;
-}
-
 sub _prepare_tempdir {
-    require File::Temp;
+   require File::Temp;
 
     state $tempdir;
 
     return $tempdir if $tempdir;
     $tempdir = File::Temp::tempdir(
         CLEANUP => $ENV{DEBUG_KEEP_TEMPDIR} ? 0:1);
-    _debug("Created tempdir: $tempdir");
+    log_debug("Created tempdir: $tempdir");
     return $tempdir;
 }
 
@@ -55,9 +46,55 @@ sub _preprocess_arg {
 
     my $file;
     my $fileopts = {};
-    if ($arg =~ /(.+?):(.+)/) {
-        $file  = $1;
-        my $table_or_fileopts = $2;
+    if ($arg eq '-') {
+        $file  = '-';
+        $fileopts->{table} = 'stdin';
+    } elsif ($arg =~ /\A(?:(\w+(?:::\w+)*)|([^:]+))(?::(.*))?\z/) {
+        my $tabledata_mod = $1;
+        $file  = $2;
+        my $table_or_fileopts = $3;
+        log_trace "tabledata_mod=<%s>, file=<%s>, table_or_fileopts=<%s>", $tabledata_mod, $file, $table_or_fileopts;
+
+        # try a TableData module first
+      TRY_TABLEDATA:
+        {
+            last unless defined $tabledata_mod;
+            require Module::Load::Util;
+            require TableDataRole::Util::CSV; # to help prereq scanner detect this prereq
+            my $tabledata_obj;
+            my $tabledata_pkg;
+            eval {
+                $tabledata_obj = Module::Load::Util::instantiate_class_with_optional_args(
+                    {ns_prefixes => ['', 'TableData']},
+                    $tabledata_mod,
+                );
+                $tabledata_pkg = ref($tabledata_obj);
+                require Role::Tiny;
+                eval { Role::Tiny->apply_roles_to_object($tabledata_obj, "TableDataRole::Util::CSV") };
+                log_warn "Can't apply role TableDataRole::Util::CSV to $tabledata_obj: $@" if $@;
+            };
+            if ($@) {
+                log_warn "Can't load TableData module '$tabledata_mod': $@";
+                $file = $tabledata_mod;
+                last;
+            }
+            # dump the tabledata content as CSV
+            my $tempdir = _prepare_tempdir();
+            my $i = 0;
+            while (1) {
+                $file = $tabledata_pkg . ($i ? ".$i" : "") . ".csv";
+                $file =~ s/::/_/g;
+                last unless -f "$tempdir/$file";
+                $i++;
+            }
+            $file = "$tempdir/$file";
+            log_debug "Writing tabledata module '$tabledata_mod' to CSV file '$file' ...";
+            open my $fh, ">", $file;
+            print $fh $tabledata_obj->as_csv;
+            close $fh;
+            goto L1;
+        }
+
         if ($table_or_fileopts =~ /=/) {
             for (split /:/, $table_or_fileopts) {
                 if (/(.+)=(.*)/) {
@@ -69,12 +106,11 @@ sub _preprocess_arg {
         } else {
             $fileopts->{table} = $table_or_fileopts;
         }
-    } elsif ($arg eq '-') {
-        $file  = '-';
-        $fileopts->{table} = 'stdin';
     } else {
-        $file  = $arg;
+        die "Invalid argument '$arg', please use '-' or FILENAME[:TABLENAME|OPT1=VAL1:...]\n";
     }
+
+  L1:
     unless (defined $fileopts->{table}) {
         $fileopts->{table} = $file;
         for ($fileopts->{table}) {
@@ -137,6 +173,7 @@ sub _register_table {
 
 sub _add {
     my ($arg, $arginfo) = @_;
+    log_debug "Adding $arg ...";
     $arginfo //= _preprocess_arg($arg);
 
     # try to detect type
@@ -352,6 +389,8 @@ sub _add_perl {
 }
 
 sub parse_cmdline {
+    require Log::ger::Util;
+
     my $res = GetOptions(
         'format|f=s'     => \$Opts{format},
         'add|a=s'        => sub { _add($_[1]) },
@@ -361,6 +400,7 @@ sub parse_cmdline {
         'add-json=s'     => sub { _add_json($_[1]) },
         'add-yaml=s'     => sub { _add_yaml($_[1]) },
         'add-perl=s'     => sub { _add_perl($_[1]) },
+        'add-tabledata=s' => sub { _add_tabledata($_[1]) },
         'load-function|F=s' => sub {
             die "Invalid function name syntax '$_[1]', please use alphanums only\n"
                 unless $_[1] =~ /\A[A-Za-z_][A-Za-z_0-9]*(:[A-Za-z_][A-Za-z_0-9]*)?\z/;
@@ -379,6 +419,11 @@ sub parse_cmdline {
         'show-schema|s'  => sub { $Opts{action} = 'show-schema' },
         'aoh'            => sub { $Opts{hash} = 1 },
         'aoa'            => sub { $Opts{hash} = 0 },
+        'log-level=s'    => sub { Log::ger::Util::set_level($_[1]) },
+        'trace'          => sub { Log::ger::Util::set_level('trace') },
+        'quiet'          => sub { Log::ger::Util::set_level('quiet') },
+        'verbose'        => sub { Log::ger::Util::set_level('info') },
+        'debug'          => sub { Log::ger::Util::set_level('debug') },
         'help|h'         => sub {
             print <<USAGE;
 Usage:
@@ -408,6 +453,7 @@ USAGE
         },
     );
     exit 99 if !$res;
+
     unless (keys %Tables) {
         _add("-");
     }
@@ -562,7 +608,7 @@ parse_cmdline();
 run();
 
 1;
-# ABSTRACT: Perform SQL queries against files in CSV/TSV/LTSV/JSON/YAML formats
+# ABSTRACT: Perform SQL queries against {CSV/TSV/LTSV/JSON/YAML files,TableData modules}
 # PODNAME:
 
 =head1 SYNOPSIS
@@ -629,11 +675,14 @@ also specify a SQL query.
 
 =over
 
-=item * --add=FILENAME[:TABLENAME|OPT1=VAL1:...], -a
+=item * --add=FILENAME[:TABLENAME|OPT1=VAL1:...] or --add=MODULENAME[:TABLENAME|OPT=VAL1:...], -a
 
 Add a table from a file. Type will be detected from filename extension (and some
 heuristics, if there is no file extension or extension is unrecognized). Die if
 type cannot be detected.
+
+Can also add a table from a L<TableData> module, in which case C<MODULENAME>
+should be in the form of C<TableData::*>.
 
 Sometimes the detection will miss. Alternatively, you can use one of the
 C<--add-TYPE> options to add a specific table type.
@@ -667,7 +716,6 @@ and so on. Has no effect on file types other than CSV/TSV.
 
 Add a table from a CSV file.
 
-
 =item * --add-tsv=FILENAME[:TABLENAME|OPT1=VAL1:...]
 
 Like C<--add-csv>, but will load file as TSV (tab-separated value).
@@ -692,6 +740,11 @@ Like C<--add-json>, but will load file as YAML.
 =item * --add-perl=FILENAME[:TABLENAME|OPT1=VAL1:...]
 
 Like C<--add-json>, but will load file as Perl.
+
+=item * --add-tabledata=MODULENAME[:TABLENAME|OPT1=VAL1:...]
+
+Add a table from a L<TableData> module. C<MODULENAME> is the module name
+with/without the C<TableData::> prefix (both will be attempted).
 
 =item * --load-function=NAME, -F
 
@@ -791,5 +844,10 @@ nicely package them so you can load them from B<fsql> simply by using the C<-F>
 option, e.g. to load the YEAR() function:
 
  % fsql -F YEAR --add-csv sometable.csv 'SELECT c1, YEAR(c2) FROM sometable ...'
+
+
+=head1 SEE ALSO
+
+L<TableData>
 
 =cut
