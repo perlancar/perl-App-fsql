@@ -92,7 +92,6 @@ sub _preprocess_arg {
             open my $fh, ">", $file;
             print $fh $tabledata_obj->as_csv;
             close $fh;
-            goto L1;
         }
 
         if ($table_or_fileopts =~ /=/) {
