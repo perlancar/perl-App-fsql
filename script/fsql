@@ -647,6 +647,12 @@ and so on):
 
  % fsql -a file.csv:header=0:table=t 'SELECT col1,col3 FROM t WHERE col0 <= 1000' > final.csv
 
+Select from L<TableData> module(s) (in this example,
+L<TableData::Sample::DeNiro>):
+
+ # what's De Niro's highest scored movie?
+ % fsql -a TableData::Sample::DeNiro:t1 'SELECT title,year,score FROM t1 ORDER BY score DESC LIMIT 1'
+
 
 =head1 DESCRIPTION
 
